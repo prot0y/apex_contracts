@@ -2287,9 +2287,14 @@ Rules:
 // ── APP ROOT ──
 function App() {
   const [page, setPage] = useState('dashboard');
-  const [projects, setProjects] = useState(SEED_PROJECTS);
-  const [employees, setEmployees] = useState(SEED_EMPLOYEES);
+  const [projects, setProjects] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
+
+  React.useEffect(() => {
+    fetch('/api/projects').then(r => r.json()).then(setProjects);
+    fetch('/api/employees').then(r => r.json()).then(setEmployees);
+  }, []);
 
   const updateProject = async (updated) => {
     await fetch(`/api/projects/${updated.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated) });
