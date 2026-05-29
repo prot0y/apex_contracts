@@ -1073,17 +1073,11 @@ function AddProjectModal({ onClose, onAdd, employees }) {
   const [form, setForm] = useState({ name: '', client: '', contractValue: '', startDate: '', phase: 'membrane', notes: '' });
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
   const emptyPhases = Object.fromEntries(PHASES.map(p => [p.id, { materials: [], labor: [] }]));
-  const handle = () => {
+  const handle = async () => {
     if (!form.name || !form.client || !form.contractValue) return;
-    onAdd({
-      id: 'p' + Date.now(),
-      name: form.name, client: form.client,
-      contractValue: parseFloat(form.contractValue),
-      startDate: form.startDate,
-      phase: form.phase, notes: form.notes,
-      changeOrders: [], retainageHeld: 0, retainageReleased: 0,
-      phases: emptyPhases,
-    });
+    const res = await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name, client: form.client, contractValue: parseFloat(form.contractValue), startDate: form.startDate, phase: form.phase, notes: form.notes }) });
+    const p = await res.json();
+    onAdd(p);
   };
   return (
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -1093,10 +1087,7 @@ function AddProjectModal({ onClose, onAdd, employees }) {
             <div className="modal-title">NEW CONTRACT</div>
             <div style={{ color: 'var(--text3)', fontSize: 12, marginTop: 3 }}>Enter contract details to begin tracking</div>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button className="btn btn-danger btn-sm" onClick={() => { if(confirm(`Delete "${project.name}"? This cannot be undone.`)) { onDelete(project.id); onClose(); } }}>Delete Contract</button>
-            <button className="modal-close" onClick={onClose}>×</button>
-          </div>
+          <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
           <div className="form-grid">
@@ -1184,6 +1175,48 @@ function AddExpenseRow({ type, employees, onAdd, onCancel }) {
 }
 
 // ── PROJECT DETAIL MODAL ──
+function ContractDetailsEditor({ project, onUpdate }) {
+  const [form, setForm] = useState({ name: project.name, client: project.client || '', contractValue: project.contractValue || '', startDate: project.startDate || '', notes: project.notes || '' });
+  const [dirty, setDirty] = useState(false);
+  const set = k => e => { setForm(f => ({ ...f, [k]: e.target.value })); setDirty(true); };
+  const save = () => {
+    onUpdate({ ...project, name: form.name, client: form.client, contractValue: parseFloat(form.contractValue) || 0, startDate: form.startDate, notes: form.notes });
+    setDirty(false);
+  };
+  return (
+    <div className="section-card" style={{ marginBottom: 16 }}>
+      <div className="section-card-header">
+        <div className="section-card-title">Contract Details</div>
+        {dirty && <button className="btn btn-primary btn-sm" onClick={save}>Save Changes</button>}
+      </div>
+      <div className="section-card-body">
+        <div className="form-grid">
+          <div className="form-group full">
+            <label className="form-label">Project Name</label>
+            <input className="form-input" value={form.name} onChange={set('name')} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Client / Owner</label>
+            <input className="form-input" value={form.client} onChange={set('client')} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Contract Value ($)</label>
+            <input className="form-input" type="number" value={form.contractValue} onChange={set('contractValue')} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Start Date</label>
+            <input className="form-input" type="date" value={form.startDate} onChange={set('startDate')} />
+          </div>
+          <div className="form-group full">
+            <label className="form-label">Notes</label>
+            <textarea className="form-input" rows={3} value={form.notes} onChange={set('notes')} style={{ resize: 'vertical' }} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ProjectDetail({ project, employees, onClose, onUpdate, onDelete }) {
   const [tab, setTab] = useState('overview');
   const [activePhase, setActivePhase] = useState(project.phase);
@@ -1391,12 +1424,9 @@ function ProjectDetail({ project, employees, onClose, onUpdate, onDelete }) {
                   <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>Margin: {calc.margin.toFixed(1)}%</div>
                 </div>
               </div>
-              {project.notes && (
-                <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>
-                  <span style={{ color: 'var(--text3)', fontSize: 11, fontFamily: 'DM Mono', letterSpacing: 1, marginRight: 8 }}>NOTES</span>
-                  {project.notes}
-                </div>
-              )}
+
+              <ContractDetailsEditor project={project} onUpdate={onUpdate} />
+
               {pendingCOs > 0 && (
                 <div style={{ background: 'rgba(230,126,34,0.08)', border: '1px solid rgba(230,126,34,0.25)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#f0b27a', display: 'flex', justifyContent: 'space-between' }}>
                   <span>⚠ Pending change orders awaiting approval</span>
