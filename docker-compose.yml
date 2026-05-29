@@ -52,7 +52,7 @@ services:
     container_name: apex-webhook
     restart: unless-stopped
     ports:
-      - "9000:9000"
+      - "9003:9000"
     environment:
       - WEBHOOK_SECRET=apex-deploy-secret
     volumes:
