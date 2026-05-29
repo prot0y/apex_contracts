@@ -44,3 +44,17 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+
+  webhook:
+    build:
+      context: ./webhook
+      dockerfile: Dockerfile
+    container_name: apex-webhook
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    environment:
+      - WEBHOOK_SECRET=apex-deploy-secret
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/apex-contracts:/opt/apex-contracts
