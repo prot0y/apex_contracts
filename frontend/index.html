@@ -1718,15 +1718,23 @@ function ProjectDetail({ project, employees, onClose, onUpdate, onDelete }) {
 }
 
 // ── EMPLOYEES PAGE ──
-function EmployeesPage({ employees, onAddEmployee }) {
+function EmployeesPage({ employees, onAddEmployee, onDeleteEmployee, onUpdateEmployee }) {
   const [form, setForm] = useState({ name: '', role: '', rate: '' });
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState(null);
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
-  const handle = () => {
+  const handle = async () => {
     if (!form.name || !form.rate) return;
-    onAddEmployee({ id: 'e' + Date.now(), name: form.name, role: form.role, rate: parseFloat(form.rate) });
+    const res = await fetch('/api/employees', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name, role: form.role, rate: parseFloat(form.rate) }) });
+    const emp = await res.json();
+    onAddEmployee(emp);
     setForm({ name: '', role: '', rate: '' });
     setAdding(false);
+  };
+  const saveEdit = () => {
+    if (!editing) return;
+    onUpdateEmployee({ ...editing, rate: parseFloat(editing.rate) || 0 });
+    setEditing(null);
   };
   return (
     <div>
@@ -1756,14 +1764,29 @@ function EmployeesPage({ employees, onAddEmployee }) {
         )}
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Name</th><th>Role</th><th>Hourly Rate</th><th>Annual (2080 hrs)</th></tr></thead>
+            <thead><tr><th>Name</th><th>Role</th><th>Hourly Rate</th><th>Annual (2080 hrs)</th><th style={{ width: 120 }}>Actions</th></tr></thead>
             <tbody>
-              {employees.map(e => (
+              {employees.map(e => editing?.id === e.id ? (
+                <tr key={e.id}>
+                  <td><input className="form-input" style={{ padding: '5px 8px' }} value={editing.name} onChange={ev => setEditing(v => ({ ...v, name: ev.target.value }))} /></td>
+                  <td><input className="form-input" style={{ padding: '5px 8px' }} value={editing.role} onChange={ev => setEditing(v => ({ ...v, role: ev.target.value }))} /></td>
+                  <td><input className="form-input" style={{ padding: '5px 8px', width: 100 }} type="number" value={editing.rate} onChange={ev => setEditing(v => ({ ...v, rate: ev.target.value }))} /></td>
+                  <td style={{ fontFamily: 'DM Mono', fontSize: 13, color: 'var(--text3)' }}>{fmt((parseFloat(editing.rate) || 0) * 2080)}</td>
+                  <td>
+                    <button className="btn btn-primary btn-sm" onClick={saveEdit}>Save</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setEditing(null)}>Cancel</button>
+                  </td>
+                </tr>
+              ) : (
                 <tr key={e.id}>
                   <td style={{ fontWeight: 600 }}>{e.name}</td>
                   <td><span className="tag tag-blue">{e.role}</span></td>
                   <td style={{ fontFamily: 'DM Mono', fontSize: 13 }}>${e.rate}/hr</td>
                   <td style={{ fontFamily: 'DM Mono', fontSize: 13, color: 'var(--text3)' }}>{fmt(e.rate * 2080)}</td>
+                  <td>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setEditing({ id: e.id, name: e.name, role: e.role, rate: e.rate })}>Edit</button>
+                    <button className="btn btn-danger btn-sm" onClick={() => { if(confirm(`Remove "${e.name}"?`)) onDeleteEmployee(e.id); }}>Delete</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -2276,6 +2299,8 @@ function App() {
 
   const addProject = (p) => setProjects(ps => [...ps, p]);
   const addEmployee = (e) => setEmployees(es => [...es, e]);
+  const deleteEmployee = async (id) => { await fetch(`/api/employees/${id}`, { method: 'DELETE' }); setEmployees(es => es.filter(e => e.id !== id)); };
+  const updateEmployee = async (emp) => { await fetch(`/api/employees/${emp.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(emp) }); setEmployees(es => es.map(e => e.id === emp.id ? emp : e)); };
   const deleteProject = async (id) => { await fetch(`/api/projects/${id}`, { method: 'DELETE' }); setProjects(ps => ps.filter(p => p.id !== id)); if (selectedProject?.id === id) setSelectedProject(null); };
 
   return (
@@ -2310,7 +2335,7 @@ function App() {
       <div className="main">
         {page === 'dashboard' && <Dashboard projects={projects} employees={employees} onSelectProject={setSelectedProject} />}
         {page === 'contracts' && <ContractsPage projects={projects} employees={employees} onSelectProject={setSelectedProject} onAddProject={addProject} onDeleteProject={deleteProject} />}
-        {page === 'employees' && <EmployeesPage employees={employees} onAddEmployee={addEmployee} />}
+        {page === 'employees' && <EmployeesPage employees={employees} onAddEmployee={addEmployee} onDeleteEmployee={deleteEmployee} onUpdateEmployee={updateEmployee} />}
       </div>
 
       <AIChatSidebar
