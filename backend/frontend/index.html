@@ -1334,7 +1334,10 @@ function ProjectDetail({ project, employees, onClose, onUpdate, onDelete }) {
             </div>
             <div style={{ color: 'var(--text3)', fontSize: 12, marginTop: 4 }}>{project.client} · Started {project.startDate || '—'}</div>
           </div>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button className="btn btn-danger btn-sm" onClick={() => { if(confirm(`Delete "${project.name}"? This cannot be undone.`)) { onDelete(project.id); onClose(); } }}>Delete Contract</button>
+            <button className="modal-close" onClick={onClose}>×</button>
+          </div>
         </div>
 
         {/* Phase stepper */}
@@ -2286,10 +2289,4 @@ function App() {
           <div className="nav-section-label">Main</div>
           {[
             { id: 'dashboard', icon: '◈', label: 'Dashboard' },
-            { id: 'contracts', icon: '◻', label: 'Contracts' },
-            { id: 'employees', icon: '◎', label: 'Employees' },
-          ].map(item => (
-            <div
-              key={item.id}
-              className={`nav-item ${page === item.id ? 'active' : ''}`}
-              onClick={() => setP
+            { id
