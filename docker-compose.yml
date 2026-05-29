@@ -1,0 +1,46 @@
+services:
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: apex-chromadb
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - /opt/apex-contracts/chroma:/data
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/data
+      - ANONYMIZED_TELEMETRY=FALSE
+
+  apex-contracts:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: apex-contracts
+    restart: unless-stopped
+    depends_on:
+      - chromadb
+    ports:
+      - "3009:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - OLLAMA_HOST=http://13.0.2.47:11435
+      - OLLAMA_MODEL=hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q5_K_M
+      - EMBED_MODEL=nomic-embed-text
+      - CHROMA_HOST=http://apex-chromadb:8000
+      - CHROMA_COLLECTION=apex_docs
+      - DB_PATH=/data/apex.db
+      - UPLOAD_PATH=/data/uploads
+      - RAG_TOP_K=5
+      - RAG_CHUNK_SIZE=512
+      - RAG_CHUNK_OVERLAP=64
+    volumes:
+      - /opt/apex-contracts/data:/data
+      - ./frontend:/app/frontend:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
