@@ -1073,11 +1073,16 @@ function AddProjectModal({ onClose, onAdd, employees }) {
   const [form, setForm] = useState({ name: '', client: '', contractValue: '', startDate: '', phase: 'membrane', notes: '' });
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
   const emptyPhases = Object.fromEntries(PHASES.map(p => [p.id, { materials: [], labor: [] }]));
+  const [error, setError] = useState('');
   const handle = async () => {
     if (!form.name || !form.client || !form.contractValue) return;
-    const res = await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name, client: form.client, contractValue: parseFloat(form.contractValue), startDate: form.startDate, phase: form.phase, notes: form.notes }) });
-    const p = await res.json();
-    onAdd(p);
+    setError('');
+    try {
+      const res = await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name, client: form.client, contractValue: parseFloat(form.contractValue), startDate: form.startDate, phase: form.phase, notes: form.notes }) });
+      const p = await res.json();
+      if (!res.ok) { setError(p.error || 'Failed to create contract'); return; }
+      onAdd(p);
+    } catch (e) { setError('Network error — could not reach server'); }
   };
   return (
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -1120,6 +1125,7 @@ function AddProjectModal({ onClose, onAdd, employees }) {
           </div>
         </div>
         <div className="modal-footer">
+          {error && <span style={{ color: '#e74c3c', fontSize: 13, flex: 1 }}>{error}</span>}
           <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
           <button className="btn btn-primary" onClick={handle}>Create Contract →</button>
         </div>

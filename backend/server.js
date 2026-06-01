@@ -335,7 +335,8 @@ app.delete('/api/employees/:id', (req, res) => {
 
 // ── PROJECTS ──────────────────────────────────────────────────────────────────
 app.get('/api/projects', (req, res) => {
-  res.json(db.projects.all());
+  try { res.json(db.projects.all()); }
+  catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/projects', (req, res) => {
