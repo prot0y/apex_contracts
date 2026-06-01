@@ -223,4 +223,18 @@ const changeOrders = {
   delete: (id) => db.prepare('DELETE FROM change_orders WHERE id = ?').run(id),
 };
 
-// ── GRACEFUL SHUTDOWN ────────────────�
+// -- GRACEFUL SHUTDOWN
+// SQLite WAL mode buffers writes in apex.db-wal. Without an explicit checkpoint
+// on exit, a sudden container stop (SIGTERM) can leave the WAL inconsistent.
+function shutdown() {
+  try {
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    db.close();
+  } catch (e) {}
+  process.exit(0);
+}
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT',  shutdown);
+
+module.exports = { db, employees, projects, materials, labor, changeOrders };
