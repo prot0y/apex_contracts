@@ -223,4 +223,4 @@ const changeOrders = {
   delete: (id) => db.prepare('DELETE FROM change_orders WHERE id = ?').run(id),
 };
 
-module.exports = { db, employees, projects, materials, labor, changeOrders };
+// ── GRACEFUL SHUTDOWN ────────────────�
