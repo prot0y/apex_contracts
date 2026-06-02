@@ -2008,7 +2008,7 @@ const SUGGESTIONS = [
   'What is the total profit across all active jobs?',
 ];
 
-function AIChatSidebar({ projects, employees, onAddProject, onUpdateProject, onAddEmployee }) {
+function AIChatSidebar({ projects, employees, onAddProject, onUpdateProject, onAddEmployee, onRefresh }) {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
@@ -2222,6 +2222,7 @@ Rules:
             role: 'system',
             content: `${data.actionResult.ok ? '✓' : '✗'} ${data.actionResult.message}`
           });
+          if (data.actionResult.ok && onRefresh) onRefresh();
         }
         if (data.ragUsed) {
           next.push({ role: 'rag', content: '📄 Answer includes context from uploaded documents' });
@@ -2340,6 +2341,14 @@ function App() {
 
   const addProject = (p) => setProjects(ps => [...ps, p]);
   const addEmployee = (e) => setEmployees(es => [...es, e]);
+  const refreshData = () => {
+    fetch('/api/projects').then(r => r.json()).then(data => {
+      setProjects(data);
+      // Keep selectedProject in sync if it was affected
+      setSelectedProject(sp => sp ? (data.find(p => p.id === sp.id) || null) : null);
+    });
+    fetch('/api/employees').then(r => r.json()).then(setEmployees);
+  };
   const deleteEmployee = async (id) => { await fetch(`/api/employees/${id}`, { method: 'DELETE' }); setEmployees(es => es.filter(e => e.id !== id)); };
   const updateEmployee = async (emp) => { await fetch(`/api/employees/${emp.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(emp) }); setEmployees(es => es.map(e => e.id === emp.id ? emp : e)); };
   const deleteProject = async (id) => { await fetch(`/api/projects/${id}`, { method: 'DELETE' }); setProjects(ps => ps.filter(p => p.id !== id)); if (selectedProject?.id === id) setSelectedProject(null); };
@@ -2384,23 +2393,4 @@ function App() {
         employees={employees}
         onAddProject={addProject}
         onUpdateProject={updateProject}
-        onAddEmployee={addEmployee}
-      />
-
-      {selectedProject && (
-        <ProjectDetail
-          project={selectedProject}
-          employees={employees}
-          onClose={() => setSelectedProject(null)}
-          onUpdate={updateProject}
-          onDelete={deleteProject}
-        />
-      )}
-    </div>
-  );
-}
-
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
-</script>
-</body>
-</html>
+       
