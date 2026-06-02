@@ -1974,7 +1974,7 @@ function ContractsPage({ projects, employees, onSelectProject, onAddProject, onD
               {filtered.map(p => {
                 const approvedCOs = p.changeOrders.filter(co => co.approved).reduce((s, co) => s + co.amount, 0);
                 return (
-                  <tr key={p.id} onClick={() => onSelectProject(p)}>
+                  <tr key={p.id} onClick={() => onSelectProject(p)} style={{ cursor: 'pointer' }}>
                     <td>
                       <div className="td-project">{p.name}</div>
                       <div className="td-client">{p.client}</div>
@@ -1987,6 +1987,9 @@ function ContractsPage({ projects, employees, onSelectProject, onAddProject, onD
                         : <span className="tag tag-orange">{p.changeOrders.length} CO{p.changeOrders.length > 1 ? 's' : ''} · {fmt(approvedCOs)} approved</span>}
                     </td>
                     <td style={{ color: 'var(--text3)', fontFamily: 'DM Mono', fontSize: 12 }}>{p.startDate || '—'}</td>
+                    <td onClick={e => e.stopPropagation()}>
+                      <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }} onClick={() => { if (window.confirm(`Delete ${p.name}?`)) onDeleteProject(p.id); }}>Delete</button>
+                    </td>
                   </tr>
                 );
               })}
@@ -2152,6 +2155,13 @@ function AIChatSidebar({ projects, employees, onAddProject, onUpdateProject, onA
         return `✓ Added employee **${action.name}** at $${action.rate}/hr`;
       }
 
+      if (action.type === 'delete_project') {
+        const p = projects.find(p => p.name.toLowerCase().includes(action.projectName?.toLowerCase()) || p.id === action.projectId);
+        if (!p) return `✗ Could not find project matching "${action.projectName}"`;
+        onDeleteProject(p.id);
+        return `✓ Deleted contract **${p.name}**`;
+      }
+
       return null;
     } catch (err) {
       return `✗ Action failed: ${err.message}`;
@@ -2183,6 +2193,7 @@ Available action types and their fields:
 - add_labor: projectName (required), employeeName (required), hours (required), phase, notes
 - add_change_order: projectName (required), description (required), amount (required), approved (boolean)
 - add_employee: name (required), role, rate (hourly dollar amount)
+- delete_project: projectName (required)
 
 Rules:
 - Only include ONE <action> block per response if an action is needed
