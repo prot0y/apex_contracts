@@ -26,16 +26,19 @@ services:
       - NODE_ENV=production
       - PORT=3000
       # ── AI provider: ollama (default, local/private) | anthropic | openai ──
-      - AI_PROVIDER=ollama
-      - OLLAMA_HOST=http://13.0.2.47:11435
-      - OLLAMA_MODEL=qwen3.5:9b
-      - OLLAMA_NUM_CTX=8192
-      - EMBED_MODEL=nomic-embed-text
+      # All values below fall back to the defaults shown; override any of them in
+      # a `.env` file next to this compose file (gitignored — safe for secrets).
+      - AI_PROVIDER=${AI_PROVIDER:-ollama}
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://13.0.2.47:11435}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen3.5:9b}
+      - OLLAMA_NUM_CTX=${OLLAMA_NUM_CTX:-8192}
+      - EMBED_MODEL=${EMBED_MODEL:-nomic-embed-text}
       # ── Cloud fallback (only used when AI_PROVIDER is anthropic/openai) ──
-      # - ANTHROPIC_API_KEY=
-      - ANTHROPIC_MODEL=claude-haiku-4-5
-      # - OPENAI_API_KEY=
-      - OPENAI_MODEL=gpt-5.4-mini
+      # Put real keys in .env, NOT here. Empty by default.
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-haiku-4-5}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-5.4-mini}
       - CHROMA_HOST=http://apex-chromadb:8000
       - CHROMA_COLLECTION=apex_docs
       - DB_PATH=/data/apex.db
