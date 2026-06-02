@@ -4,10 +4,21 @@
 - Docker + Docker Compose installed on your home server
 - Ollama running on 13.0.2.47 with the following models pulled:
   ```
-  ollama pull qwen2.5:7b
+  ollama pull qwen3.5:9b
   ollama pull nomic-embed-text
   ```
 - Port 3000 open on your server (for Cosmos Cloud to proxy)
+
+## AI provider (local by default, cloud optional)
+The AI agent is provider-configurable via env vars in `docker-compose.yml`:
+- `AI_PROVIDER=ollama` (default) — fully local/private. Uses `OLLAMA_MODEL=qwen3.5:9b`
+  with **schema-enforced structured output** so the model reliably emits executable
+  commands. `OLLAMA_NUM_CTX=8192` keeps the KV cache within the Tesla P4's 8 GB.
+- `AI_PROVIDER=anthropic` — set `ANTHROPIC_API_KEY` (model `claude-haiku-4-5`).
+- `AI_PROVIDER=openai` — set `OPENAI_API_KEY` (model `gpt-5.4-mini`).
+
+The agent can create/update/delete contracts, expenses (materials & labor), change
+orders, retainage, employees, and **invoices** — just ask it in plain English.
 
 ---
 

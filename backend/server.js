@@ -107,6 +107,21 @@ function executeAction(action, projects, employees) {
     const nl = name.toLowerCase();
     return employees.find(e => e.name.toLowerCase().includes(nl));
   };
+  // Locate an invoice by its number (preferred) or by the most recent on a project.
+  const findInvoice = (a) => {
+    const all = db.invoices.all();
+    if (a.invoiceNumber) {
+      const nl = String(a.invoiceNumber).toLowerCase();
+      const hit = all.find(i => (i.number || '').toLowerCase() === nl)
+               || all.find(i => (i.number || '').toLowerCase().includes(nl));
+      if (hit) return hit;
+    }
+    if (a.projectName || a.projectId) {
+      const p = findProject(a.projectName, a.projectId);
+      if (p) return all.find(i => i.projectId === p.id) || null;
+    }
+    return null;
+  };
 
   switch (action.type) {
     case 'create_project': {
@@ -300,6 +315,93 @@ function executeAction(action, projects, employees) {
       return { ok: true, message: `Updated ${empName} labor on ${p.name}: ${oldHours}h → ${action.hours}h` };
     }
 
+    case 'update_change_order': {
+      const p = findProject(action.projectName, action.projectId);
+      if (!p) return { ok: false, message: `Project not found: ${action.projectName}` };
+      const co = p.changeOrders.find(c => c.description.toLowerCase().includes((action.changeOrderDescription || '').toLowerCase()));
+      if (!co) return { ok: false, message: `Change order not found: ${action.changeOrderDescription}` };
+      const fields = {};
+      if (action.description !== undefined) fields.description = action.description;
+      if (action.amount !== undefined) fields.amount = action.amount;
+      if (action.approved !== undefined) fields.approved = action.approved;
+      db.changeOrders.update(co.id, fields);
+      return { ok: true, message: `Updated change order "${co.description}" on ${p.name}` };
+    }
+
+    case 'delete_change_order': {
+      const p = findProject(action.projectName, action.projectId);
+      if (!p) return { ok: false, message: `Project not found: ${action.projectName}` };
+      const co = p.changeOrders.find(c => c.description.toLowerCase().includes((action.changeOrderDescription || '').toLowerCase()));
+      if (!co) return { ok: false, message: `Change order not found: ${action.changeOrderDescription}` };
+      db.changeOrders.delete(co.id);
+      return { ok: true, message: `Deleted change order "${co.description}" from ${p.name}` };
+    }
+
+    case 'update_employee': {
+      const emp = findEmployee(action.employeeName, action.employeeId);
+      if (!emp) return { ok: false, message: `Employee not found: ${action.employeeName}` };
+      const fields = action.fields || {};
+      if (action.name !== undefined) fields.name = action.name;
+      if (action.role !== undefined) fields.role = action.role;
+      if (action.rate !== undefined) fields.rate = action.rate;
+      const updated = db.employees.update(emp.id, fields);
+      return { ok: true, message: `Updated employee ${updated.name}`, data: updated };
+    }
+
+    case 'delete_employee': {
+      const emp = findEmployee(action.employeeName, action.employeeId);
+      if (!emp) return { ok: false, message: `Employee not found: ${action.employeeName}` };
+      db.employees.delete(emp.id);
+      return { ok: true, message: `Deleted employee ${emp.name}` };
+    }
+
+    case 'create_invoice': {
+      const p = findProject(action.projectName, action.projectId);
+      if (!p) return { ok: false, message: `Project not found: ${action.projectName}` };
+      const inv = db.invoices.create({
+        projectId: p.id,
+        number: action.invoiceNumber,
+        status: action.status || 'draft',
+        issueDate: action.issueDate || null,
+        dueDate: action.dueDate || null,
+        notes: action.notes || '',
+        items: action.items || [],
+      });
+      return { ok: true, message: `Created invoice ${inv.number} for ${p.name} ($${inv.total.toLocaleString()})`, data: inv };
+    }
+
+    case 'update_invoice': {
+      const inv = findInvoice(action);
+      if (!inv) return { ok: false, message: `Invoice not found: ${action.invoiceNumber || action.projectName}` };
+      const fields = action.fields || {};
+      if (action.invoiceNumber !== undefined && action.fields?.invoiceNumber === undefined && !action.number) {
+        // invoiceNumber here is used to locate, not rename — skip
+      }
+      if (action.status !== undefined) fields.status = action.status;
+      if (action.issueDate !== undefined) fields.issueDate = action.issueDate;
+      if (action.dueDate !== undefined) fields.dueDate = action.dueDate;
+      if (action.notes !== undefined) fields.notes = action.notes;
+      if (Array.isArray(action.items)) fields.items = action.items;
+      const updated = db.invoices.update(inv.id, fields);
+      return { ok: true, message: `Updated invoice ${updated.number}`, data: updated };
+    }
+
+    case 'set_invoice_status': {
+      const inv = findInvoice(action);
+      if (!inv) return { ok: false, message: `Invoice not found: ${action.invoiceNumber}` };
+      try {
+        const updated = db.invoices.update(inv.id, { status: action.status });
+        return { ok: true, message: `Invoice ${updated.number} marked ${updated.status}`, data: updated };
+      } catch (e) { return { ok: false, message: e.message }; }
+    }
+
+    case 'delete_invoice': {
+      const inv = findInvoice(action);
+      if (!inv) return { ok: false, message: `Invoice not found: ${action.invoiceNumber}` };
+      db.invoices.delete(inv.id);
+      return { ok: true, message: `Deleted invoice ${inv.number}` };
+    }
+
     default:
       return { ok: false, message: `Unknown action type: ${action.type}` };
   }
@@ -419,6 +521,62 @@ app.put('/api/projects/:id/change-orders/:coId', (req, res) => {
 app.delete('/api/projects/:id/change-orders/:coId', (req, res) => {
   db.changeOrders.delete(req.params.coId);
   res.json({ ok: true });
+});
+
+// ── INVOICES ──────────────────────────────────────────────────────────────────
+// List all invoices (optionally scoped to a project via /api/projects/:id/invoices)
+app.get('/api/invoices', (req, res) => {
+  try { res.json(db.invoices.all()); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/projects/:id/invoices', (req, res) => {
+  try { res.json(db.invoices.all(req.params.id)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/invoices/:invId', (req, res) => {
+  const inv = db.invoices.get(req.params.invId);
+  if (!inv) return res.status(404).json({ error: 'Not found' });
+  res.json(inv);
+});
+
+app.post('/api/projects/:id/invoices', (req, res) => {
+  try {
+    const project = db.projects.get(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const inv = db.invoices.create({ projectId: req.params.id, ...req.body });
+    res.status(201).json(inv);
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.put('/api/invoices/:invId', (req, res) => {
+  try {
+    const inv = db.invoices.update(req.params.invId, req.body);
+    if (!inv) return res.status(404).json({ error: 'Not found' });
+    res.json(inv);
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.delete('/api/invoices/:invId', (req, res) => {
+  db.invoices.delete(req.params.invId);
+  res.json({ ok: true });
+});
+
+// Line items
+app.post('/api/invoices/:invId/items', (req, res) => {
+  try { res.status(201).json(db.invoices.addItem(req.params.invId, req.body)); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.put('/api/invoices/:invId/items/:itemId', (req, res) => {
+  try { db.invoices.updateItem(req.params.itemId, req.body); res.json(db.invoices.get(req.params.invId)); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.delete('/api/invoices/:invId/items/:itemId', (req, res) => {
+  db.invoices.deleteItem(req.params.itemId);
+  res.json(db.invoices.get(req.params.invId));
 });
 
 // ── DOCUMENTS (RAG) ───────────────────────────────────────────────────────────

@@ -1223,6 +1223,176 @@ function ContractDetailsEditor({ project, onUpdate }) {
   );
 }
 
+// ── INVOICES TAB ──────────────────────────────────────────────────────────
+const INVOICE_STATUSES = ['draft', 'sent', 'paid', 'void'];
+const INVOICE_STATUS_COLOR = { draft: 'var(--text3)', sent: 'var(--blue)', paid: 'var(--green)', void: 'var(--red)' };
+const blankItem = () => ({ description: '', quantity: 1, unitPrice: 0 });
+
+function InvoiceTab({ project }) {
+  const [invoices, setInvoices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [draft, setDraft] = useState(null); // { number, status, issueDate, dueDate, notes, items: [] }
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${project.id}/invoices`);
+      setInvoices(await res.json());
+    } catch (e) { setError(e.message); }
+    setLoading(false);
+  };
+  React.useEffect(() => { load(); }, [project.id]);
+
+  const startCreate = () => {
+    setEditingId(null);
+    setDraft({ number: '', status: 'draft', issueDate: new Date().toISOString().slice(0, 10), dueDate: '', notes: '', items: [blankItem()] });
+    setCreating(true);
+  };
+  const startEdit = (inv) => {
+    setCreating(false);
+    setEditingId(inv.id);
+    setDraft({
+      number: inv.number, status: inv.status, issueDate: inv.issueDate || '',
+      dueDate: inv.dueDate || '', notes: inv.notes || '',
+      items: inv.items.length ? inv.items.map(it => ({ description: it.description, quantity: it.quantity, unitPrice: it.unitPrice })) : [blankItem()],
+    });
+  };
+  const cancel = () => { setCreating(false); setEditingId(null); setDraft(null); setError(''); };
+
+  const setItem = (i, key, val) => setDraft(d => ({ ...d, items: d.items.map((it, j) => j === i ? { ...it, [key]: val } : it) }));
+  const addItem = () => setDraft(d => ({ ...d, items: [...d.items, blankItem()] }));
+  const removeItem = (i) => setDraft(d => ({ ...d, items: d.items.filter((_, j) => j !== i) }));
+  const draftTotal = () => (draft?.items || []).reduce((s, it) => s + (parseFloat(it.quantity) || 0) * (parseFloat(it.unitPrice) || 0), 0);
+
+  const save = async () => {
+    setError('');
+    const payload = {
+      number: draft.number.trim(),
+      status: draft.status,
+      issueDate: draft.issueDate || null,
+      dueDate: draft.dueDate || null,
+      notes: draft.notes,
+      items: draft.items
+        .filter(it => it.description.trim() || parseFloat(it.unitPrice))
+        .map(it => ({ description: it.description, quantity: parseFloat(it.quantity) || 0, unitPrice: parseFloat(it.unitPrice) || 0 })),
+    };
+    try {
+      const url = editingId ? `/api/invoices/${editingId}` : `/api/projects/${project.id}/invoices`;
+      const res = await fetch(url, { method: editingId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (!res.ok) throw new Error((await res.json()).error || 'Save failed');
+      cancel();
+      load();
+    } catch (e) { setError(e.message); }
+  };
+
+  const remove = async (inv) => {
+    if (!window.confirm(`Delete invoice ${inv.number}? This cannot be undone.`)) return;
+    await fetch(`/api/invoices/${inv.id}`, { method: 'DELETE' });
+    load();
+  };
+  const quickStatus = async (inv, status) => {
+    await fetch(`/api/invoices/${inv.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
+    load();
+  };
+
+  const editor = (
+    <div style={{ border: '1px solid var(--border2)', borderRadius: 8, padding: 14, marginBottom: 16, background: 'var(--surface2)' }}>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+        <label style={{ flex: '1 1 130px', fontSize: 12 }}>Invoice #
+          <input value={draft.number} placeholder="auto" onChange={e => setDraft(d => ({ ...d, number: e.target.value }))} style={{ width: '100%' }} />
+        </label>
+        <label style={{ flex: '1 1 120px', fontSize: 12 }}>Status
+          <select value={draft.status} onChange={e => setDraft(d => ({ ...d, status: e.target.value }))} style={{ width: '100%' }}>
+            {INVOICE_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </label>
+        <label style={{ flex: '1 1 130px', fontSize: 12 }}>Issued
+          <input type="date" value={draft.issueDate || ''} onChange={e => setDraft(d => ({ ...d, issueDate: e.target.value }))} style={{ width: '100%' }} />
+        </label>
+        <label style={{ flex: '1 1 130px', fontSize: 12 }}>Due
+          <input type="date" value={draft.dueDate || ''} onChange={e => setDraft(d => ({ ...d, dueDate: e.target.value }))} style={{ width: '100%' }} />
+        </label>
+      </div>
+
+      <table className="inline-table" style={{ marginBottom: 8 }}>
+        <thead><tr><th>Description</th><th style={{ width: 70 }}>Qty</th><th style={{ width: 110 }}>Unit price</th><th style={{ width: 110 }}>Amount</th><th style={{ width: 36 }}></th></tr></thead>
+        <tbody>
+          {draft.items.map((it, i) => (
+            <tr key={i}>
+              <td><input value={it.description} onChange={e => setItem(i, 'description', e.target.value)} style={{ width: '100%' }} placeholder="Line item" /></td>
+              <td><input type="number" value={it.quantity} onChange={e => setItem(i, 'quantity', e.target.value)} style={{ width: '100%' }} /></td>
+              <td><input type="number" value={it.unitPrice} onChange={e => setItem(i, 'unitPrice', e.target.value)} style={{ width: '100%' }} /></td>
+              <td>{fmt((parseFloat(it.quantity) || 0) * (parseFloat(it.unitPrice) || 0))}</td>
+              <td><button className="btn-icon" title="Remove line" onClick={() => removeItem(i)}>✕</button></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <button className="btn-ghost" onClick={addItem} style={{ marginBottom: 10 }}>+ Add line</button>
+
+      <label style={{ display: 'block', fontSize: 12, marginBottom: 10 }}>Notes
+        <textarea value={draft.notes} onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))} style={{ width: '100%', minHeight: 48 }} />
+      </label>
+
+      {error && <div style={{ color: 'var(--red)', fontSize: 12, marginBottom: 8 }}>{error}</div>}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ fontWeight: 600 }}>Total: {fmt(draftTotal())}</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn-ghost" onClick={cancel}>Cancel</button>
+          <button className="btn-primary" onClick={save}>{editingId ? 'Save changes' : 'Create invoice'}</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div style={{ fontSize: 13, color: 'var(--text2)' }}>
+          {invoices.length} invoice{invoices.length !== 1 ? 's' : ''} · Billed {fmt(invoices.reduce((s, i) => s + i.total, 0))} · Paid {fmt(invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.total, 0))}
+        </div>
+        {!creating && editingId === null && <button className="btn-primary" onClick={startCreate}>+ New invoice</button>}
+      </div>
+
+      {creating && draft && editor}
+
+      {loading ? <div style={{ color: 'var(--text3)', fontSize: 13 }}>Loading…</div> : (
+        invoices.length === 0 && !creating ? (
+          <div className="empty-state"><div className="empty-state-sub">No invoices yet. Create one, or ask the AI assistant: "invoice {project.name} for the deposit".</div></div>
+        ) : (
+          <table className="inline-table">
+            <thead><tr><th>Invoice</th><th>Status</th><th>Issued</th><th>Due</th><th style={{ textAlign: 'right' }}>Total</th><th style={{ width: 150 }}></th></tr></thead>
+            <tbody>
+              {invoices.map(inv => editingId === inv.id ? (
+                <tr key={inv.id}><td colSpan={6} style={{ padding: 0 }}>{draft && editor}</td></tr>
+              ) : (
+                <tr key={inv.id}>
+                  <td style={{ fontWeight: 600 }}>{inv.number}<div style={{ fontSize: 11, color: 'var(--text3)' }}>{inv.items.length} line{inv.items.length !== 1 ? 's' : ''}</div></td>
+                  <td>
+                    <select value={inv.status} onChange={e => quickStatus(inv, e.target.value)} style={{ color: INVOICE_STATUS_COLOR[inv.status], fontWeight: 600, border: '1px solid var(--border)', borderRadius: 4, padding: '2px 4px' }}>
+                      {INVOICE_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </td>
+                  <td style={{ color: 'var(--text2)' }}>{inv.issueDate || '—'}</td>
+                  <td style={{ color: 'var(--text2)' }}>{inv.dueDate || '—'}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(inv.total)}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    <button className="btn-ghost" onClick={() => startEdit(inv)}>Edit</button>
+                    <button className="btn-ghost" style={{ color: 'var(--red)' }} onClick={() => remove(inv)}>Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )
+      )}
+    </>
+  );
+}
+
 function ProjectDetail({ project, employees, onClose, onUpdate, onDelete }) {
   const [tab, setTab] = useState('overview');
   const [activePhase, setActivePhase] = useState(project.phase);
@@ -1397,7 +1567,7 @@ function ProjectDetail({ project, employees, onClose, onUpdate, onDelete }) {
         </div>
 
         <div className="detail-tabs">
-          {['overview', 'expenses', 'change orders', 'retainage', 'documents'].map(t => (
+          {['overview', 'expenses', 'change orders', 'invoices', 'retainage', 'documents'].map(t => (
             <div key={t} className={`detail-tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
               {t.charAt(0).toUpperCase() + t.slice(1)}
               {t === 'change orders' && project.changeOrders.length > 0 &&
@@ -1639,6 +1809,9 @@ function ProjectDetail({ project, employees, onClose, onUpdate, onDelete }) {
               </div>
             </>
           )}
+
+          {/* INVOICES */}
+          {tab === 'invoices' && <InvoiceTab project={project} />}
 
           {/* RETAINAGE */}
           {tab === 'retainage' && (
@@ -2006,8 +2179,9 @@ function ContractsPage({ projects, employees, onSelectProject, onAddProject, onD
 const SUGGESTIONS = [
   'Add a new contract for Elmwood Apartments, $118,000, membrane phase',
   'Log 14 hours for Marcus Webb on Riverside Commons metal phase',
+  'Create an invoice for Riverside Commons: deposit $50,000',
+  'Mark invoice INV-0001 as paid',
   'Add a change order to Sunridge for skylight reframe, $2,400',
-  'Move Crestwood Unit 7 to QC phase',
   'What is the total profit across all active jobs?',
 ];
 
@@ -2015,7 +2189,7 @@ function AIChatSidebar({ projects, employees, onAddProject, onUpdateProject, onA
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: "Hey — I'm your Apex AI assistant powered by qwen2.5. Tell me what you need and I'll update your contracts, log expenses, or pull up a summary.\n\nTry one of the suggestions below to get started."
+      content: "Hey — I'm your Apex AI assistant. Tell me what you need and I'll update contracts, log expenses, create and update invoices, manage change orders, or pull up a P&L summary.\n\nTry one of the suggestions below to get started."
     }
   ]);
   const [input, setInput] = useState('');
@@ -2242,10 +2416,12 @@ Rules:
       });
 
     } catch (err) {
-      // Demo mode fallback when Ollama isn't reachable
-      const demoReply = getDemoReply(text.trim(), context);
-      setMessages(m => [...m, { role: 'assistant', content: demoReply }, { role: 'error', content: `⚠ AI backend unreachable — showing demo response. Check that the server and Ollama are running.` }]);
-      setConnected(false);
+      // Surface the real error instead of a misleading demo reply.
+      const isNetwork = err.name === 'TypeError' || /fetch|network/i.test(err.message || '');
+      setMessages(m => [...m, { role: 'error', content: isNetwork
+        ? `⚠ Can't reach the AI backend. Check that the app server and Ollama (or your configured provider) are running.`
+        : `⚠ ${err.message}` }]);
+      if (isNetwork) setConnected(false);
     } finally {
       setThinking(false);
     }
