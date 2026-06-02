@@ -2407,6 +2407,15 @@ function App() {
         onAddEmployee={addEmployee}
         onRefresh={refreshData}
       />
+      {selectedProject && (
+        <ProjectDetail
+          project={selectedProject}
+          employees={employees}
+          onClose={() => setSelectedProject(null)}
+          onUpdate={updateProject}
+          onDelete={(id) => { deleteProject(id); setSelectedProject(null); }}
+        />
+      )}
     </div>
   );
 }
