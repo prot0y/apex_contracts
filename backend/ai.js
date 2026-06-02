@@ -323,4 +323,12 @@ async function checkEmbedModel() {
   }
 }
 
-module.exports = { chat, checkEmbedModel };
+// Active provider + model, surfaced via /api/health for the UI status line.
+function aiInfo() {
+  const model = PROVIDER === 'anthropic' ? ANTHROPIC_MODEL
+              : PROVIDER === 'openai'    ? OPENAI_MODEL
+              :                            OLLAMA_MODEL;
+  return { provider: PROVIDER, model };
+}
+
+module.exports = { chat, checkEmbedModel, aiInfo };

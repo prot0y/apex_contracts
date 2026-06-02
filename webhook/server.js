@@ -15,8 +15,13 @@ function verify(body, sig) {
 function deploy() {
   console.log(`[${new Date().toISOString()}] Starting deploy...`);
   try {
-    execSync(`cd ${REPO_DIR} && git pull origin main`, { stdio: 'inherit', timeout: 30000 });
-    console.log('Git pull complete.');
+    // Force the working tree to match origin/main rather than `git pull`.
+    // A plain pull aborts whenever a tracked file has drifted on the server
+    // (CRLF changes, a manual `sed`, etc.), which silently freezes deploys.
+    // App data lives in gitignored bind-mounts (data/, chroma/), so a hard
+    // reset never touches it.
+    execSync(`cd ${REPO_DIR} && git fetch origin main && git reset --hard origin/main`, { stdio: 'inherit', timeout: 30000 });
+    console.log('Synced working tree to origin/main.');
     exec(`cd ${REPO_DIR} && docker compose up -d --build apex-contracts`, (err, stdout, stderr) => {
       if (err) console.error('Build error:', stderr);
       else console.log('Rebuild complete:', stdout);

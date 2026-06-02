@@ -31,7 +31,7 @@ const fs       = require('fs');
 const multer   = require('multer');
 
 const db             = require('./db');
-const { chat, checkEmbedModel } = require('./ai');
+const { chat, checkEmbedModel, aiInfo } = require('./ai');
 const { ingestPDF, deleteDocument, listDocuments } = require('./rag');
 
 const app  = express();
@@ -409,7 +409,7 @@ function executeAction(action, projects, employees) {
 
 // ── HEALTH ────────────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', ts: new Date().toISOString() });
+  res.json({ status: 'ok', ts: new Date().toISOString(), ...aiInfo() });
 });
 
 // ── EMPLOYEES ─────────────────────────────────────────────────────────────────

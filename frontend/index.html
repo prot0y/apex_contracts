@@ -2196,6 +2196,7 @@ function AIChatSidebar({ projects, employees, onAddProject, onUpdateProject, onA
   const [thinking, setThinking] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [connected, setConnected] = useState(null); // null=checking, true=ok, false=down
+  const [aiInfo, setAiInfo] = useState(null);       // { provider, model } from /api/health
   const messagesEndRef = React.useRef(null);
   const textareaRef = React.useRef(null);
 
@@ -2205,6 +2206,7 @@ function AIChatSidebar({ projects, employees, onAddProject, onUpdateProject, onA
       try {
         const res = await fetch('/api/health', { signal: AbortSignal.timeout(4000) });
         setConnected(res.ok);
+        if (res.ok) { try { setAiInfo(await res.json()); } catch {} }
       } catch {
         setConnected(false);
       }
@@ -2456,7 +2458,7 @@ Rules:
             background: connected === null ? '#f59e0b' : connected ? '#16a34a' : '#dc2626',
             boxShadow: connected === null ? '0 0 6px #f59e0b' : connected ? '0 0 6px #16a34a' : '0 0 6px #dc2626',
           }} />
-          {connected === null ? 'Connecting...' : connected ? 'hf.co/bartowski/Qwen2.5-7B' : 'Offline — check Ollama'}
+          {connected === null ? 'Connecting...' : connected ? (aiInfo?.model || 'AI ready') : 'Offline — check Ollama'}
         </div>
       </div>
 
