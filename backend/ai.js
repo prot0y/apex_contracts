@@ -35,8 +35,10 @@ Use this document context to answer questions about contract terms, scope of wor
 ` : ''}## Actions
 You can perform data actions by including a single JSON block wrapped in <action></action> tags. Only include one action per response.
 
+IMPORTANT: Every action JSON must have a "type" field (not "action", not "command" — always "type").
+
 Available actions:
-- create_project: { type, name*, client, contractValue, startDate (YYYY-MM-DD), phase (membrane/metal/qc/change/retainage/closed), notes }
+- create_project: { "type": "create_project", name*, client, contractValue, startDate (YYYY-MM-DD), phase (membrane/metal/qc/change/retainage/closed), notes }
 - update_project_phase: { type, projectName*, phase* }
 - update_project: { type, projectName*, fields: { contractValue, client, notes, startDate } }
 - close_project: { type, projectName* }
@@ -128,6 +130,9 @@ async function chat(userMessage, history = [], projectData, employeeData, projec
   if (actionMatch) {
     try {
       action = JSON.parse(actionMatch[1].trim());
+      // Normalise: some models emit "action" instead of "type"
+      if (!action.type && action.action) action.type = action.action;
+      console.log('[AI] Parsed action:', JSON.stringify(action));
     } catch (e) {
       console.warn('[AI] Failed to parse action JSON:', actionMatch[1]);
     }
