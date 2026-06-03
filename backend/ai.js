@@ -20,6 +20,9 @@ const PROVIDER = (process.env.AI_PROVIDER || 'ollama').toLowerCase();
 const OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://13.0.2.47:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen3.5:9b';
 const NUM_CTX = parseInt(process.env.OLLAMA_NUM_CTX || '8192');
+// Hard ceiling on any single AI request so a stalled model can never hang the
+// chat endpoint (and the UI spinner) forever. Returns a clear error instead.
+const REQUEST_TIMEOUT_MS = parseInt(process.env.AI_TIMEOUT_MS || '90000');
 
 // Cloud
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
@@ -189,11 +192,16 @@ async function callOllama(messages) {
   const res = await fetch(`${OLLAMA_HOST}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     body: JSON.stringify({
       model: OLLAMA_MODEL,
       stream: false,
-      format: RESPONSE_SCHEMA,          // <-- schema-enforced structured output
-      options: { temperature: 0.2, top_p: 0.9, num_ctx: NUM_CTX },
+      think: false,                     // qwen3.5 is a reasoning model; its <think>
+                                        // phase loops/stalls under a grammar-constrained
+                                        // (format) response, so disable it. We don't need
+                                        // chain-of-thought to parse CRUD commands.
+      format: RESPONSE_SCHEMA,          // schema-enforced structured output
+      options: { temperature: 0.2, top_p: 0.9, num_ctx: NUM_CTX, num_predict: 1024 },
       messages,
     }),
   });
@@ -211,6 +219,7 @@ async function callAnthropic(messages) {
   convo.push({ role: 'assistant', content: '{' });
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     headers: {
       'Content-Type': 'application/json',
       'x-api-key': ANTHROPIC_API_KEY,
@@ -232,6 +241,7 @@ async function callOpenAI(messages) {
   if (!OPENAI_API_KEY) throw new Error('AI_PROVIDER=openai but OPENAI_API_KEY is not set');
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
     body: JSON.stringify({
       model: OPENAI_MODEL, temperature: 0.2,

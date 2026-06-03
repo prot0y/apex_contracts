@@ -4,7 +4,7 @@
 - Docker + Docker Compose installed on your home server
 - Ollama running on 13.0.2.47 with the following models pulled:
   ```
-  ollama pull qwen3.5:4b
+  ollama pull hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q5_K_M
   ollama pull nomic-embed-text
   ```
 - Port 3000 open on your server (for Cosmos Cloud to proxy)
@@ -13,8 +13,10 @@
 The AI agent is provider-configurable via env vars in `docker-compose.yml`:
 - `AI_PROVIDER=ollama` (default) — fully local/private. Uses `OLLAMA_MODEL=qwen3.5:9b`
   with **schema-enforced structured output** so the model reliably emits executable
-  commands. `qwen3.5:4b` (3.4 GB) + `OLLAMA_NUM_CTX=8192` fits the Tesla P4's 8 GB
-  with headroom; the 9b weights (6.6 GB) overflow once the KV cache is added.
+  commands. Default model is `Qwen2.5-7B-Instruct` (Q5_K_M, ~5.4 GB) — a non-reasoning
+  instruct model that fits the Tesla P4's 8 GB and works cleanly with the JSON grammar.
+  (Avoid qwen3.5 "thinking" variants here: their reasoning phase fights the grammar and
+  stalls.) `OLLAMA_NUM_CTX=8192`.
 - `AI_PROVIDER=anthropic` — set `ANTHROPIC_API_KEY` (model `claude-haiku-4-5`).
 - `AI_PROVIDER=openai` — set `OPENAI_API_KEY` (model `gpt-5.4-mini`).
 
