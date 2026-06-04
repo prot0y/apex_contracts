@@ -1337,7 +1337,7 @@ function InvoiceTab({ project }) {
     load();
   };
 
-  const editor = (
+  const editor = draft && (
     <div style={{ border: '1px solid var(--border2)', borderRadius: 8, padding: 14, marginBottom: 16, background: 'var(--surface2)' }}>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
         <label style={{ flex: '1 1 130px', fontSize: 12 }}>Invoice #
