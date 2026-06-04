@@ -1534,20 +1534,24 @@ function ProjectDetail({ project, employees, onClose, onUpdate, onDelete }) {
     onUpdate({ ...project, phase });
   };
 
-  const addMaterial = (item) => {
+  const addMaterial = async (item) => {
+    const res = await fetch(`/api/projects/${project.id}/materials`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phase: activePhase, desc: item.desc, vendor: item.vendor, amount: item.amount }) });
+    const saved = res.ok ? await res.json() : item;
     const updated = { ...project };
     updated.phases = { ...updated.phases };
     updated.phases[activePhase] = { ...updated.phases[activePhase] };
-    updated.phases[activePhase].materials = [...updated.phases[activePhase].materials, item];
+    updated.phases[activePhase].materials = [...updated.phases[activePhase].materials, saved];
     onUpdate(updated);
     setAddingMat(false);
   };
 
-  const addLabor = (item) => {
+  const addLabor = async (item) => {
+    const res = await fetch(`/api/projects/${project.id}/labor`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phase: activePhase, employeeId: item.employeeId, hours: item.hours, notes: item.notes }) });
+    const saved = res.ok ? await res.json() : item;
     const updated = { ...project };
     updated.phases = { ...updated.phases };
     updated.phases[activePhase] = { ...updated.phases[activePhase] };
-    updated.phases[activePhase].labor = [...updated.phases[activePhase].labor, item];
+    updated.phases[activePhase].labor = [...updated.phases[activePhase].labor, saved];
     onUpdate(updated);
     setAddingLab(false);
   };
