@@ -1569,9 +1569,10 @@ function ProjectDetail({ project, employees, onClose, onUpdate, onDelete }) {
     onUpdate(updated);
   };
 
-  const phaseData = project.phases[activePhase] || { materials: [], labor: [] };
-  const phaseMaterialTotal = phaseData.materials.reduce((s, m) => s + m.amount, 0);
-  const phaseLaborTotal = phaseData.labor.reduce((s, l) => { const e = empMap[l.employeeId]; return s + (e ? e.rate * l.hours : 0); }, 0);
+  const allMaterials = PHASES.flatMap(ph => (project.phases[ph.id] || { materials: [] }).materials.map(m => ({ ...m, _phase: ph.id })));
+  const allLabor = PHASES.flatMap(ph => (project.phases[ph.id] || { labor: [] }).labor.map(l => ({ ...l, _phase: ph.id })));
+  const phaseMaterialTotal = allMaterials.reduce((s, m) => s + m.amount, 0);
+  const phaseLaborTotal = allLabor.reduce((s, l) => { const e = empMap[l.employeeId]; return s + (e ? e.rate * l.hours : 0); }, 0);
   const pendingCOs = project.changeOrders.filter(co => !co.approved).reduce((s, co) => s + co.amount, 0);
   const currentPhaseIdx = PHASE_INDEX[project.phase] || 0;
 
@@ -1658,19 +1659,6 @@ function ProjectDetail({ project, employees, onClose, onUpdate, onDelete }) {
           {/* EXPENSES */}
           {tab === 'expenses' && (
             <>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-                {PHASES.map(p => (
-                  <button
-                    key={p.id}
-                    className={`btn btn-ghost btn-sm`}
-                    style={activePhase === p.id ? { borderColor: 'var(--accent)', color: 'var(--accent)', background: 'var(--accent-dim)' } : {}}
-                    onClick={() => { setActivePhase(p.id); setAddingMat(false); setAddingLab(false); }}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-
               <div className="section-card">
                 <div className="section-card-header">
                   <div className="section-card-title">Materials</div>
@@ -1684,16 +1672,16 @@ function ProjectDetail({ project, employees, onClose, onUpdate, onDelete }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {phaseData.materials.length === 0 && !addingMat && (
-                        <tr><td colSpan={4} style={{ color: 'var(--text3)', textAlign: 'center', padding: 20 }}>No materials logged for this phase</td></tr>
+                      {allMaterials.length === 0 && !addingMat && (
+                        <tr><td colSpan={4} style={{ color: 'var(--text3)', textAlign: 'center', padding: 20 }}>No materials logged for this contract</td></tr>
                       )}
-                      {phaseData.materials.map(m => editingMat?.id === m.id ? (
+                      {allMaterials.map(m => editingMat?.id === m.id ? (
                         <tr key={m.id} style={{ background: 'var(--accent-dim)' }}>
                           <td><input className="form-input" style={{ padding: '5px 8px' }} value={editingMat.desc} onChange={e => setEditingMat(v => ({ ...v, desc: e.target.value }))} /></td>
                           <td><input className="form-input" style={{ padding: '5px 8px' }} value={editingMat.vendor} onChange={e => setEditingMat(v => ({ ...v, vendor: e.target.value }))} /></td>
                           <td><input className="form-input" style={{ padding: '5px 8px', width: 100 }} type="number" value={editingMat.amount} onChange={e => setEditingMat(v => ({ ...v, amount: e.target.value }))} /></td>
                           <td><div style={{ display: 'flex', gap: 4 }}>
-                            <button className="btn btn-primary btn-sm" onClick={() => saveEditMaterial(activePhase)}>Save</button>
+                            <button className="btn btn-primary btn-sm" onClick={() => saveEditMaterial(editingMat._phase)}>Save</button>
                             <button className="btn btn-ghost btn-sm" onClick={() => setEditingMat(null)}>×</button>
                           </div></td>
                         </tr>
@@ -1703,8 +1691,8 @@ function ProjectDetail({ project, employees, onClose, onUpdate, onDelete }) {
                           <td style={{ color: 'var(--text3)', fontFamily: 'DM Mono', fontSize: 12 }}>{m.vendor}</td>
                           <td style={{ fontFamily: 'DM Mono', fontSize: 12.5 }}>{fmt(m.amount)}</td>
                           <td><div style={{ display: 'flex', gap: 4 }}>
-                            <button className="btn btn-ghost btn-sm" onClick={() => setEditingMat({ id: m.id, desc: m.desc, vendor: m.vendor || '', amount: m.amount })}>Edit</button>
-                            <button className="btn btn-danger btn-sm" onClick={() => { if(confirm('Remove this material?')) deleteMaterial(m.id, activePhase); }}>×</button>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setEditingMat({ id: m.id, desc: m.desc, vendor: m.vendor || '', amount: m.amount, _phase: m._phase })}>Edit</button>
+                            <button className="btn btn-danger btn-sm" onClick={() => { if(confirm('Remove this material?')) deleteMaterial(m.id, m._phase); }}>×</button>
                           </div></td>
                         </tr>
                       ))}
@@ -1730,10 +1718,10 @@ function ProjectDetail({ project, employees, onClose, onUpdate, onDelete }) {
                       <tr><th>Employee</th><th>Hours</th><th>Rate</th><th>Total</th><th>Notes</th><th></th></tr>
                     </thead>
                     <tbody>
-                      {phaseData.labor.length === 0 && !addingLab && (
-                        <tr><td colSpan={6} style={{ color: 'var(--text3)', textAlign: 'center', padding: 20 }}>No labor logged for this phase</td></tr>
+                      {allLabor.length === 0 && !addingLab && (
+                        <tr><td colSpan={6} style={{ color: 'var(--text3)', textAlign: 'center', padding: 20 }}>No labor logged for this contract</td></tr>
                       )}
-                      {phaseData.labor.map(l => {
+                      {allLabor.map(l => {
                         const emp = empMap[l.employeeId];
                         return editingLab?.id === l.id ? (
                           <tr key={l.id} style={{ background: 'var(--accent-dim)' }}>
@@ -1747,7 +1735,7 @@ function ProjectDetail({ project, employees, onClose, onUpdate, onDelete }) {
                             <td style={{ fontFamily: 'DM Mono', fontSize: 12 }}>{empMap[editingLab.employeeId] ? fmt(empMap[editingLab.employeeId].rate * (parseFloat(editingLab.hours)||0)) : '—'}</td>
                             <td><input className="form-input" style={{ padding: '5px 8px' }} value={editingLab.notes} onChange={e => setEditingLab(v => ({ ...v, notes: e.target.value }))} placeholder="Notes" /></td>
                             <td><div style={{ display: 'flex', gap: 4 }}>
-                              <button className="btn btn-primary btn-sm" onClick={() => saveEditLabor(activePhase)}>Save</button>
+                              <button className="btn btn-primary btn-sm" onClick={() => saveEditLabor(editingLab._phase)}>Save</button>
                               <button className="btn btn-ghost btn-sm" onClick={() => setEditingLab(null)}>×</button>
                             </div></td>
                           </tr>
@@ -1762,8 +1750,8 @@ function ProjectDetail({ project, employees, onClose, onUpdate, onDelete }) {
                             <td style={{ fontFamily: 'DM Mono', fontSize: 12.5 }}>{emp ? fmt(emp.rate * l.hours) : '—'}</td>
                             <td style={{ color: 'var(--text3)', fontSize: 12 }}>{l.notes}</td>
                             <td><div style={{ display: 'flex', gap: 4 }}>
-                              <button className="btn btn-ghost btn-sm" onClick={() => setEditingLab({ id: l.id, employeeId: l.employeeId, hours: l.hours, notes: l.notes || '' })}>Edit</button>
-                              <button className="btn btn-danger btn-sm" onClick={() => { if(confirm('Remove this labor entry?')) deleteLabor(l.id, activePhase); }}>×</button>
+                              <button className="btn btn-ghost btn-sm" onClick={() => setEditingLab({ id: l.id, employeeId: l.employeeId, hours: l.hours, notes: l.notes || '', _phase: l._phase })}>Edit</button>
+                              <button className="btn btn-danger btn-sm" onClick={() => { if(confirm('Remove this labor entry?')) deleteLabor(l.id, l._phase); }}>×</button>
                             </div></td>
                           </tr>
                         );
@@ -2956,7 +2944,7 @@ function App() {
           ))}
         </nav>
         <div className="sidebar-footer">
-          v2.1.0 · Build
+          v2.2.0 · Build
         </div>
       </div>
 
