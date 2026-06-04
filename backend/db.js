@@ -81,6 +81,26 @@ db.exec(`
     unit_price  REAL NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  -- Calendar tasks / "to-dos": invitations to bid, RFQs, submittals, inspections, etc.
+  -- project_id is NULLable on purpose: a bid invite usually arrives BEFORE a contract
+  -- exists, so it lives in the pipeline and can be linked to a project later.
+  CREATE TABLE IF NOT EXISTS tasks (
+    id          TEXT PRIMARY KEY,
+    type        TEXT NOT NULL DEFAULT 'other',   -- itb | rfq | submittal | inspection | deadline | followup | other
+    title       TEXT NOT NULL,
+    project_id  TEXT REFERENCES projects(id) ON DELETE SET NULL,
+    client      TEXT DEFAULT '',
+    due_date    TEXT,                             -- YYYY-MM-DD (optionally with time)
+    status      TEXT NOT NULL DEFAULT 'open',     -- open | done | cancelled
+    priority    TEXT NOT NULL DEFAULT 'normal',   -- low | normal | high
+    source      TEXT NOT NULL DEFAULT 'manual',   -- manual | ai | email
+    notes       TEXT DEFAULT '',
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_tasks_due    ON tasks(due_date);
+  CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 `);
 
 // ── ID HELPER ────────────────────────────────────────────────────────────────
@@ -352,6 +372,82 @@ const invoices = {
   deleteItem: (itemId) => db.prepare('DELETE FROM invoice_items WHERE id = ?').run(itemId),
 };
 
+// ── TASKS (calendar to-dos) ──────────────────────────────────────────────────
+const VALID_TASK_TYPE     = ['itb', 'rfq', 'submittal', 'inspection', 'deadline', 'followup', 'other'];
+const VALID_TASK_STATUS   = ['open', 'done', 'cancelled'];
+const VALID_TASK_PRIORITY = ['low', 'normal', 'high'];
+
+const tasks = {
+  _hydrate: (row) => {
+    if (!row) return null;
+    return {
+      id: row.id,
+      type: row.type,
+      title: row.title,
+      projectId: row.project_id,
+      client: row.client,
+      dueDate: row.due_date,
+      status: row.status,
+      priority: row.priority,
+      source: row.source,
+      notes: row.notes,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  },
+
+  // Optional filters: { from, to } (inclusive due_date range, YYYY-MM-DD),
+  // status, type, projectId. Open items with no due date always come back too.
+  all: ({ from = null, to = null, status = null, type = null, projectId = null } = {}) => {
+    const where = [];
+    const params = [];
+    if (from)      { where.push('(due_date IS NULL OR due_date >= ?)'); params.push(from); }
+    if (to)        { where.push('(due_date IS NULL OR due_date <= ?)'); params.push(to); }
+    if (status)    { where.push('status = ?');     params.push(status); }
+    if (type)      { where.push('type = ?');       params.push(type); }
+    if (projectId) { where.push('project_id = ?'); params.push(projectId); }
+    const sql = `SELECT * FROM tasks ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+                 ORDER BY (due_date IS NULL), due_date ASC, created_at ASC`;
+    return db.prepare(sql).all(...params).map(tasks._hydrate);
+  },
+
+  get: (id) => tasks._hydrate(db.prepare('SELECT * FROM tasks WHERE id = ?').get(id)),
+
+  create: ({ type = 'other', title, projectId = null, client = '', dueDate = null,
+             status = 'open', priority = 'normal', source = 'manual', notes = '' }) => {
+    if (!title || !String(title).trim()) throw new Error('title is required');
+    const safeType     = VALID_TASK_TYPE.includes(type) ? type : 'other';
+    const safeStatus   = VALID_TASK_STATUS.includes(status) ? status : 'open';
+    const safePriority = VALID_TASK_PRIORITY.includes(priority) ? priority : 'normal';
+    const id = uid('t');
+    db.prepare(`INSERT INTO tasks (id, type, title, project_id, client, due_date, status, priority, source, notes)
+                VALUES (?,?,?,?,?,?,?,?,?,?)`)
+      .run(id, safeType, String(title).trim(), projectId, client, dueDate, safeStatus, safePriority, source, notes);
+    return tasks.get(id);
+  },
+
+  update: (id, fields) => {
+    const map = {
+      type: 'type', title: 'title', projectId: 'project_id', client: 'client',
+      dueDate: 'due_date', status: 'status', priority: 'priority', notes: 'notes',
+    };
+    if (fields.type && !VALID_TASK_TYPE.includes(fields.type))
+      throw new Error(`Invalid type "${fields.type}". Use one of: ${VALID_TASK_TYPE.join(', ')}`);
+    if (fields.status && !VALID_TASK_STATUS.includes(fields.status))
+      throw new Error(`Invalid status "${fields.status}". Use one of: ${VALID_TASK_STATUS.join(', ')}`);
+    if (fields.priority && !VALID_TASK_PRIORITY.includes(fields.priority))
+      throw new Error(`Invalid priority "${fields.priority}". Use one of: ${VALID_TASK_PRIORITY.join(', ')}`);
+    const keys = Object.keys(fields).filter(k => map[k] && fields[k] !== undefined);
+    if (!keys.length) return tasks.get(id);
+    const sets = keys.map(k => `${map[k]} = ?`).concat(["updated_at = datetime('now')"]);
+    const vals = keys.map(k => fields[k]);
+    db.prepare(`UPDATE tasks SET ${sets.join(', ')} WHERE id = ?`).run(...vals, id);
+    return tasks.get(id);
+  },
+
+  delete: (id) => db.prepare('DELETE FROM tasks WHERE id = ?').run(id),
+};
+
 // -- GRACEFUL SHUTDOWN
 // SQLite WAL mode buffers writes in apex.db-wal. Without an explicit checkpoint
 // on exit, a sudden container stop (SIGTERM) can leave the WAL inconsistent.
@@ -366,4 +462,4 @@ function shutdown() {
 process.on('SIGTERM', shutdown);
 process.on('SIGINT',  shutdown);
 
-module.exports = { db, employees, projects, materials, labor, changeOrders, invoices };
+module.exports = { db, employees, projects, materials, labor, changeOrders, invoices, tasks };

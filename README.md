@@ -139,6 +139,50 @@ Simple cron backup example:
 
 ---
 
+## Calendar & Tasks
+
+The **Calendar** tab tracks deadline-driven to-dos — invitations to bid (ITB), requests for quote/pricing (RFQ), submittals, inspections, deadlines, and follow-ups. Tasks can stand alone (a bid invite before any contract exists) or be linked to a contract. A month grid and an agenda view are both available; overdue open items are flagged.
+
+**Create tasks three ways:**
+
+1. **By hand** — click any day, or the **+ New task** button.
+2. **By chatting with the AI** — e.g. *"add an invitation to bid for the Westfield gym re-roof, due next Friday"* or *"mark the Turner RFQ done"*. The assistant resolves relative dates and files the task automatically.
+3. **Automatically from email** (optional, see below).
+
+**Subscribe from your phone/desktop calendar.** A read-only iCal feed of every open dated task is served at:
+
+```
+https://<your-host>/api/calendar.ics
+```
+
+Add it as a subscribed calendar in Google Calendar, Outlook, or Apple Calendar and tasks appear alongside your normal events.
+
+### Inbound email -> auto-task
+
+Point an email-forwarding service at the app and bid invites / RFQs that land in your inbox become tasks automatically:
+
+```
+POST https://<your-host>/api/inbound-email?token=<INBOUND_EMAIL_TOKEN>
+```
+
+1. Set `INBOUND_EMAIL_TOKEN` in `.env` to a long random string (see `.env.example`).
+2. Create a forwarding rule in **Mailgun Routes**, **SendGrid Inbound Parse**, **Postmark**, or **CloudMailin** that POSTs incoming mail to the URL above.
+3. Each email is classified by the AI. Actionable mail (ITB/RFQ/deadline/etc.) becomes a calendar task with the due date extracted; newsletters and FYI mail are ignored.
+
+The endpoint accepts JSON or form-encoded bodies and normalizes common provider field names (`subject`, `text`/`body-plain`/`TextBody`, `from`/`sender`).
+
+### Task API (for scripting)
+
+```
+GET    /api/tasks?from=YYYY-MM-DD&to=YYYY-MM-DD&status=open&type=itb&projectId=...
+POST   /api/tasks            { type, title, dueDate, client, projectId, priority, notes }
+PUT    /api/tasks/:id        { ...any field... }
+DELETE /api/tasks/:id
+GET    /api/calendar.ics     (iCal feed; add ?includeDone=1 to include completed)
+```
+
+---
+
 ## Updating the App
 ```bash
 cd apex-contracts

@@ -46,6 +46,8 @@ services:
       - RAG_TOP_K=5
       - RAG_CHUNK_SIZE=512
       - RAG_CHUNK_OVERLAP=64
+      # Shared secret for the inbound-email → auto-task endpoint (empty = open).
+      - INBOUND_EMAIL_TOKEN=${INBOUND_EMAIL_TOKEN:-}
     volumes:
       - /opt/apex-contracts/data:/data
       - ./frontend:/app/frontend:ro

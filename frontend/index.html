@@ -871,6 +871,45 @@
     margin-top: 6px;
     text-align: center;
   }
+
+  /* ── CALENDAR ── */
+  .cal-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .cal-nav-btn {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; width: 32px; height: 32px; cursor: pointer; font-size: 16px;
+    display: flex; align-items: center; justify-content: center; transition: all .15s;
+  }
+  .cal-nav-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .cal-month-label { font-size: 18px; font-weight: 600; min-width: 190px; }
+  .cal-today-btn {
+    background: transparent; border: 1px solid var(--border); color: var(--text2);
+    border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 12px;
+  }
+  .cal-today-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .cal-dow { background: var(--surface2); padding: 8px 6px; text-align: center; font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .5px; }
+  .cal-cell { background: var(--surface); min-height: 96px; padding: 6px; position: relative; cursor: pointer; transition: background .12s; }
+  .cal-cell:hover { background: var(--surface2); }
+  .cal-cell.cal-other { background: var(--bg); opacity: .55; }
+  .cal-cell.cal-today { box-shadow: inset 0 0 0 2px var(--accent); }
+  .cal-daynum { font-size: 12px; color: var(--text2); font-weight: 500; }
+  .cal-today .cal-daynum { color: var(--accent); font-weight: 700; }
+  .cal-pill {
+    display: block; width: 100%; text-align: left; border: none; cursor: pointer;
+    font-size: 11px; line-height: 1.3; padding: 2px 6px; margin-top: 3px; border-radius: 5px;
+    color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .cal-pill.cal-done { opacity: .5; text-decoration: line-through; }
+  .cal-more { font-size: 10px; color: var(--text3); margin-top: 3px; }
+  .cal-legend { display: flex; gap: 14px; flex-wrap: wrap; margin: 14px 0 4px; font-size: 11px; color: var(--text2); }
+  .cal-legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .cal-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .agenda-item { display: flex; align-items: center; gap: 12px; padding: 10px 4px; border-bottom: 1px solid var(--border); }
+  .agenda-item:last-child { border-bottom: none; }
+  .agenda-date { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text2); width: 96px; flex-shrink: 0; }
+  .agenda-overdue { color: var(--red); font-weight: 600; }
+  .badge-type { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 5px; color: #fff; text-transform: uppercase; letter-spacing: .4px; flex-shrink: 0; }
+  .cal-feed-link { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text3); word-break: break-all; }
 </style>
 </head>
 <body>
@@ -2006,8 +2045,250 @@ function EmployeesPage({ employees, onAddEmployee, onDeleteEmployee, onUpdateEmp
   );
 }
 
+// ── CALENDAR ──────────────────────────────────────────────────────────────
+const TASK_TYPES = [
+  { id: 'itb',        label: 'Invitation to Bid', short: 'ITB',    color: '#1a6cff' },
+  { id: 'rfq',        label: 'Request for Quote', short: 'RFQ',    color: '#8b5cf6' },
+  { id: 'submittal',  label: 'Submittal',         short: 'SUB',    color: '#0a8a4e' },
+  { id: 'inspection', label: 'Inspection',        short: 'INSP',   color: '#0891b2' },
+  { id: 'deadline',   label: 'Deadline',          short: 'DUE',    color: '#d42b2b' },
+  { id: 'followup',   label: 'Follow-up',         short: 'F/U',    color: '#d97706' },
+  { id: 'other',      label: 'Other',             short: 'TASK',   color: '#8a97ab' },
+];
+const TYPE_META = Object.fromEntries(TASK_TYPES.map(t => [t.id, t]));
+const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+const toYMD = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const parseYMD = (s) => { const [y,m,d] = String(s).slice(0,10).split('-').map(Number); return new Date(y, m-1, d); };
+const fmtDate = (s) => parseYMD(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+
+function CalendarPage({ projects, onSelectProject, refreshTick }) {
+  const [tasks, setTasks] = useState([]);
+  const [view, setView] = useState('month');           // 'month' | 'agenda'
+  const [cursor, setCursor] = useState(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
+  const [editing, setEditing] = useState(null);        // task being edited
+  const [form, setForm] = useState(null);              // form object when creating/editing
+
+  const load = () => fetch('/api/tasks').then(r => r.json()).then(setTasks).catch(() => {});
+  React.useEffect(() => { load(); }, [refreshTick]);
+
+  const todayYMD = toYMD(new Date());
+  const projName = (id) => (projects.find(p => p.id === id) || {}).name || '';
+
+  const openCreate = (dateYMD) => {
+    setEditing(null);
+    setForm({ type: 'itb', title: '', dueDate: dateYMD || '', client: '', projectId: '', priority: 'normal', status: 'open', notes: '' });
+  };
+  const openEdit = (t) => {
+    setEditing(t);
+    setForm({ type: t.type, title: t.title, dueDate: t.dueDate || '', client: t.client || '', projectId: t.projectId || '', priority: t.priority, status: t.status, notes: t.notes || '' });
+  };
+  const closeForm = () => { setForm(null); setEditing(null); };
+
+  const save = async () => {
+    if (!form.title.trim()) return;
+    const payload = { ...form, projectId: form.projectId || null, dueDate: form.dueDate || null };
+    if (editing) {
+      await fetch(`/api/tasks/${editing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    } else {
+      await fetch('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    }
+    closeForm(); load();
+  };
+  const setStatus = async (t, status) => {
+    await fetch(`/api/tasks/${t.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
+    load();
+  };
+  const remove = async (t) => {
+    if (!window.confirm(`Delete task "${t.title}"?`)) return;
+    await fetch(`/api/tasks/${t.id}`, { method: 'DELETE' });
+    closeForm(); load();
+  };
+
+  // Build the 6-week grid for the current cursor month
+  const weeks = useMemo(() => {
+    const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+    const start = new Date(first); start.setDate(1 - first.getDay());
+    const byDay = {};
+    tasks.forEach(t => { if (t.dueDate) (byDay[t.dueDate.slice(0,10)] = byDay[t.dueDate.slice(0,10)] || []).push(t); });
+    const w = [];
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(start); d.setDate(start.getDate() + i);
+      const ymd = toYMD(d);
+      w.push({ date: d, ymd, inMonth: d.getMonth() === cursor.getMonth(), items: byDay[ymd] || [] });
+    }
+    return w;
+  }, [cursor, tasks]);
+
+  const moveMonth = (n) => setCursor(c => new Date(c.getFullYear(), c.getMonth() + n, 1));
+  const goToday   = () => { const n = new Date(); setCursor(new Date(n.getFullYear(), n.getMonth(), 1)); };
+
+  const feedUrl = `${location.origin}/api/calendar.ics`;
+
+  // Agenda: open tasks sorted; dated first, undated last
+  const agenda = useMemo(() => {
+    const open = tasks.filter(t => t.status === 'open');
+    const dated = open.filter(t => t.dueDate).sort((a,b) => a.dueDate.localeCompare(b.dueDate));
+    const undated = open.filter(t => !t.dueDate);
+    return [...dated, ...undated];
+  }, [tasks]);
+
+  return (
+    <div>
+      <div className="page-header">
+        <div>
+          <div className="page-title">CALENDAR</div>
+          <div className="page-subtitle">Bid invites, RFQs, submittals, inspections &amp; deadlines</div>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-ghost btn-sm" onClick={() => setView(view === 'month' ? 'agenda' : 'month')}>
+            {view === 'month' ? '☰ Agenda' : '▦ Month'}
+          </button>
+          <button className="btn btn-primary" onClick={() => openCreate('')}>+ New task</button>
+        </div>
+      </div>
+
+      <div className="content">
+      <div className="cal-legend">
+        {TASK_TYPES.map(t => <span key={t.id}><span className="cal-dot" style={{ background: t.color }}></span>{t.label}</span>)}
+      </div>
+
+      {view === 'month' ? (
+        <>
+          <div className="cal-toolbar">
+            <button className="cal-nav-btn" onClick={() => moveMonth(-1)}>‹</button>
+            <div className="cal-month-label">{MONTHS[cursor.getMonth()]} {cursor.getFullYear()}</div>
+            <button className="cal-nav-btn" onClick={() => moveMonth(1)}>›</button>
+            <button className="cal-today-btn" onClick={goToday}>Today</button>
+          </div>
+          <div className="cal-grid">
+            {DOW.map(d => <div key={d} className="cal-dow">{d}</div>)}
+            {weeks.map((cell, i) => (
+              <div
+                key={i}
+                className={`cal-cell ${cell.inMonth ? '' : 'cal-other'} ${cell.ymd === todayYMD ? 'cal-today' : ''}`}
+                onClick={() => openCreate(cell.ymd)}
+              >
+                <div className="cal-daynum">{cell.date.getDate()}</div>
+                {cell.items.slice(0, 3).map(t => (
+                  <button
+                    key={t.id}
+                    className={`cal-pill ${t.status === 'done' ? 'cal-done' : ''}`}
+                    style={{ background: (TYPE_META[t.type] || TYPE_META.other).color }}
+                    title={`${(TYPE_META[t.type]||TYPE_META.other).label}: ${t.title}`}
+                    onClick={(e) => { e.stopPropagation(); openEdit(t); }}
+                  >
+                    {(TYPE_META[t.type]||TYPE_META.other).short} {t.title}
+                  </button>
+                ))}
+                {cell.items.length > 3 && <div className="cal-more">+{cell.items.length - 3} more</div>}
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div className="table-wrap">
+          {agenda.length === 0 ? (
+            <div className="empty-state"><div className="empty-state-sub">No open tasks. Create one, or ask the AI assistant: "add an invitation to bid for the Westfield re-roof due next Friday".</div></div>
+          ) : agenda.map(t => {
+            const meta = TYPE_META[t.type] || TYPE_META.other;
+            const overdue = t.dueDate && t.dueDate.slice(0,10) < todayYMD;
+            return (
+              <div key={t.id} className="agenda-item">
+                <span className={`agenda-date ${overdue ? 'agenda-overdue' : ''}`}>{t.dueDate ? fmtDate(t.dueDate) : 'No date'}</span>
+                <span className="badge-type" style={{ background: meta.color }}>{meta.short}</span>
+                <span style={{ flex: 1, fontWeight: 500 }}>
+                  {t.priority === 'high' && <span style={{ color: 'var(--red)', marginRight: 6 }}>⚑</span>}
+                  {t.title}
+                  {t.projectId
+                    ? <span style={{ color: 'var(--text3)', fontWeight: 400, cursor: 'pointer' }} onClick={() => onSelectProject && onSelectProject(projects.find(p => p.id === t.projectId))}> · {projName(t.projectId)}</span>
+                    : (t.client ? <span style={{ color: 'var(--text3)', fontWeight: 400 }}> · {t.client}</span> : null)}
+                </span>
+                <button className="cal-today-btn" onClick={() => setStatus(t, 'done')}>✓ Done</button>
+                <button className="cal-today-btn" onClick={() => openEdit(t)}>Edit</button>
+              </div>
+            );
+          })}
+          <div style={{ marginTop: 16, fontSize: 12, color: 'var(--text2)' }}>
+            Subscribe from Google / Outlook / iPhone: <span className="cal-feed-link">{feedUrl}</span>
+          </div>
+        </div>
+      )}
+      </div>
+
+      {form && (
+        <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && closeForm()}>
+          <div className="modal">
+            <div className="modal-header">
+              <div>
+                <div className="modal-title">{editing ? 'EDIT TASK' : 'NEW TASK'}</div>
+                <div style={{ color: 'var(--text3)', fontSize: 12, marginTop: 3 }}>Tasks can stand alone or link to a contract</div>
+              </div>
+              <button className="modal-close" onClick={closeForm}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-grid">
+                <div className="form-group full">
+                  <label className="form-label">Title</label>
+                  <input className="form-input" autoFocus placeholder="e.g. Bid — Westfield HS gym re-roof"
+                         value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Type</label>
+                  <select className="form-select" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
+                    {TASK_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Due Date</label>
+                  <input type="date" className="form-input" value={form.dueDate ? form.dueDate.slice(0,10) : ''} onChange={e => setForm({ ...form, dueDate: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Priority</label>
+                  <select className="form-select" value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })}>
+                    <option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Status</label>
+                  <select className="form-select" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
+                    <option value="open">Open</option><option value="done">Done</option><option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+                <div className="form-group full">
+                  <label className="form-label">Link to Contract (optional)</label>
+                  <select className="form-select" value={form.projectId} onChange={e => setForm({ ...form, projectId: e.target.value })}>
+                    <option value="">— None (pipeline / pre-contract) —</option>
+                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+                <div className="form-group full">
+                  <label className="form-label">Client / Requesting Company</label>
+                  <input className="form-input" placeholder="e.g. Turner Construction" value={form.client} onChange={e => setForm({ ...form, client: e.target.value })} />
+                </div>
+                <div className="form-group full">
+                  <label className="form-label">Notes</label>
+                  <input className="form-input" placeholder="Location, scope, contact..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              {editing && <button className="btn btn-danger" onClick={() => remove(editing)} style={{ marginRight: 'auto' }}>Delete</button>}
+              <button className="btn btn-ghost" onClick={closeForm}>Cancel</button>
+              <button className="btn btn-primary" onClick={save}>{editing ? 'Save' : 'Create'} →</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── DASHBOARD ──
-function Dashboard({ projects, employees, onSelectProject }) {
+function Dashboard({ projects, employees, onSelectProject, refreshTick, onGoCalendar }) {
+  const [tasks, setTasks] = useState([]);
+  React.useEffect(() => { fetch('/api/tasks?status=open').then(r => r.json()).then(setTasks).catch(() => {}); }, [refreshTick]);
   const calcs = useMemo(() => projects.map(p => ({ ...calcProject(p, employees), id: p.id })), [projects, employees]);
   const totalRevenue = calcs.reduce((s, c) => s + c.totalRevenue, 0);
   const totalCost = calcs.reduce((s, c) => s + c.totalCost, 0);
@@ -2063,6 +2344,45 @@ function Dashboard({ projects, employees, onSelectProject }) {
               {pipelineCounts[p.id]?.value > 0 && <div className="ps-value">{fmt(pipelineCounts[p.id].value)}</div>}
             </div>
           ))}
+        </div>
+
+        {/* Upcoming deadlines */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, marginTop: 4 }}>
+          <div style={{ fontSize: 11, letterSpacing: 2, color: 'var(--text3)', fontFamily: 'DM Mono', textTransform: 'uppercase' }}>Upcoming Deadlines</div>
+          {onGoCalendar && <button className="btn btn-ghost btn-sm" onClick={onGoCalendar}>Open calendar →</button>}
+        </div>
+        <div className="table-wrap" style={{ marginBottom: 24 }}>
+          {(() => {
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const open = tasks.filter(t => t.status === 'open');
+            const sorted = [...open.filter(t => t.dueDate).sort((a, b) => a.dueDate.localeCompare(b.dueDate)), ...open.filter(t => !t.dueDate)].slice(0, 5);
+            if (sorted.length === 0) return <div className="empty-state"><div className="empty-state-sub">No open tasks. Add one in the Calendar tab, or ask the AI assistant.</div></div>;
+            const relLabel = (ymd) => {
+              const d = parseYMD(ymd); d.setHours(0, 0, 0, 0);
+              const days = Math.round((d - today) / 86400000);
+              if (days < 0) return { txt: `${-days}d overdue`, color: 'var(--red)' };
+              if (days === 0) return { txt: 'today', color: 'var(--red)' };
+              if (days === 1) return { txt: 'tomorrow', color: 'var(--text2)' };
+              return { txt: `in ${days}d`, color: 'var(--text2)' };
+            };
+            return sorted.map(t => {
+              const meta = TYPE_META[t.type] || TYPE_META.other;
+              const rel = t.dueDate ? relLabel(t.dueDate.slice(0, 10)) : { txt: 'no date', color: 'var(--text3)' };
+              const proj = t.projectId ? projects.find(p => p.id === t.projectId) : null;
+              return (
+                <div key={t.id} className="agenda-item" onClick={() => proj && onSelectProject(proj)} style={{ cursor: proj ? 'pointer' : 'default' }}>
+                  <span className="agenda-date">{t.dueDate ? fmtDate(t.dueDate) : '—'}</span>
+                  <span className="badge-type" style={{ background: meta.color }}>{meta.short}</span>
+                  <span style={{ flex: 1, fontWeight: 500 }}>
+                    {t.priority === 'high' && <span style={{ color: 'var(--red)', marginRight: 6 }}>⚑</span>}
+                    {t.title}
+                    {(proj || t.client) && <span style={{ color: 'var(--text3)', fontWeight: 400 }}> · {proj ? proj.name : t.client}</span>}
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: rel.color, fontFamily: 'DM Mono' }}>{rel.txt}</span>
+                </div>
+              );
+            });
+          })()}
         </div>
 
         {/* Top projects by margin */}
@@ -2516,6 +2836,7 @@ function App() {
   const [projects, setProjects] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
+  const [refreshTick, setRefreshTick] = useState(0);  // bumped on refresh so CalendarPage reloads tasks
 
   React.useEffect(() => {
     fetch('/api/projects').then(r => r.json()).then(setProjects);
@@ -2537,6 +2858,7 @@ function App() {
       setSelectedProject(sp => sp ? (data.find(p => p.id === sp.id) || null) : null);
     });
     fetch('/api/employees').then(r => r.json()).then(setEmployees);
+    setRefreshTick(t => t + 1);  // trigger CalendarPage to reload tasks (e.g. after an AI add_task)
   };
   const deleteEmployee = async (id) => { await fetch(`/api/employees/${id}`, { method: 'DELETE' }); setEmployees(es => es.filter(e => e.id !== id)); };
   const updateEmployee = async (emp) => { await fetch(`/api/employees/${emp.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(emp) }); setEmployees(es => es.map(e => e.id === emp.id ? emp : e)); };
@@ -2554,6 +2876,7 @@ function App() {
           {[
             { id: 'dashboard', icon: '◈', label: 'Dashboard' },
             { id: 'contracts', icon: '◻', label: 'Contracts' },
+            { id: 'calendar', icon: '▦', label: 'Calendar' },
             { id: 'employees', icon: '◎', label: 'Employees' },
           ].map(item => (
             <div
@@ -2572,8 +2895,9 @@ function App() {
       </div>
 
       <div className="main">
-        {page === 'dashboard' && <Dashboard projects={projects} employees={employees} onSelectProject={setSelectedProject} />}
+        {page === 'dashboard' && <Dashboard projects={projects} employees={employees} onSelectProject={setSelectedProject} refreshTick={refreshTick} onGoCalendar={() => setPage('calendar')} />}
         {page === 'contracts' && <ContractsPage projects={projects} employees={employees} onSelectProject={setSelectedProject} onAddProject={addProject} onDeleteProject={deleteProject} />}
+        {page === 'calendar' && <CalendarPage projects={projects} onSelectProject={setSelectedProject} refreshTick={refreshTick} />}
         {page === 'employees' && <EmployeesPage employees={employees} onAddEmployee={addEmployee} onDeleteEmployee={deleteEmployee} onUpdateEmployee={updateEmployee} />}
       </div>
 

@@ -31,7 +31,7 @@ const fs       = require('fs');
 const multer   = require('multer');
 
 const db             = require('./db');
-const { chat, checkEmbedModel, aiInfo } = require('./ai');
+const { chat, checkEmbedModel, aiInfo, classifyEmail } = require('./ai');
 const { ingestPDF, deleteDocument, listDocuments } = require('./rag');
 
 const app  = express();
@@ -42,7 +42,13 @@ fs.mkdirSync(UPLOAD_PATH, { recursive: true });
 
 // ── MIDDLEWARE ────────────────────────────────────────────────────────────────
 app.use(cors());
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '2mb' }));
+// Inbound email forwarders (Mailgun/SendGrid/Postmark/CloudMailin) often POST
+// form-encoded bodies rather than JSON, so accept both.
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+
+// Shared secret guarding the inbound-email endpoint (set in .env).
+const INBOUND_EMAIL_TOKEN = process.env.INBOUND_EMAIL_TOKEN || '';
 
 // Serve frontend
 const FRONTEND = path.join(__dirname, 'frontend');
@@ -121,6 +127,16 @@ function executeAction(action, projects, employees) {
       if (p) return all.find(i => i.projectId === p.id) || null;
     }
     return null;
+  };
+  // Locate a task by (current) title — exact match preferred, then substring.
+  // Only open/active tasks are matched so a finished item isn't accidentally re-edited.
+  const findTask = (a) => {
+    const needle = (a.title || '').toLowerCase().trim();
+    if (!needle) return null;
+    const open = db.tasks.all({}).filter(t => t.status !== 'cancelled');
+    return open.find(t => t.title.toLowerCase() === needle)
+        || open.find(t => t.title.toLowerCase().includes(needle))
+        || null;
   };
 
   switch (action.type) {
@@ -402,6 +418,57 @@ function executeAction(action, projects, employees) {
       return { ok: true, message: `Deleted invoice ${inv.number}` };
     }
 
+    case 'add_task': {
+      const p = (action.projectName || action.projectId) ? findProject(action.projectName, action.projectId) : null;
+      const t = db.tasks.create({
+        type: action.taskType || 'other',
+        title: action.title || action.description,
+        projectId: p ? p.id : null,
+        client: action.client || '',
+        dueDate: action.dueDate || null,
+        priority: action.priority || 'normal',
+        source: 'ai',
+        notes: action.notes || '',
+      });
+      const due = t.dueDate ? ` (due ${t.dueDate})` : '';
+      return { ok: true, message: `Added ${t.type.toUpperCase()} task "${t.title}"${due}`, data: t };
+    }
+
+    case 'update_task': {
+      const t = findTask(action);
+      if (!t) return { ok: false, message: `Task not found: ${action.title}` };
+      const fields = {};
+      if (action.newTitle !== undefined) fields.title = action.newTitle;
+      if (action.taskType !== undefined) fields.type = action.taskType;
+      if (action.dueDate !== undefined) fields.dueDate = action.dueDate;
+      if (action.priority !== undefined) fields.priority = action.priority;
+      if (action.taskStatus !== undefined) fields.status = action.taskStatus;
+      if (action.client !== undefined) fields.client = action.client;
+      if (action.notes !== undefined) fields.notes = action.notes;
+      if (action.projectName || action.projectId) {
+        const p = findProject(action.projectName, action.projectId);
+        if (p) fields.projectId = p.id;
+      }
+      try {
+        const updated = db.tasks.update(t.id, fields);
+        return { ok: true, message: `Updated task "${updated.title}"`, data: updated };
+      } catch (e) { return { ok: false, message: e.message }; }
+    }
+
+    case 'complete_task': {
+      const t = findTask(action);
+      if (!t) return { ok: false, message: `Task not found: ${action.title}` };
+      const updated = db.tasks.update(t.id, { status: 'done' });
+      return { ok: true, message: `Marked task "${updated.title}" done`, data: updated };
+    }
+
+    case 'delete_task': {
+      const t = findTask(action);
+      if (!t) return { ok: false, message: `Task not found: ${action.title}` };
+      db.tasks.delete(t.id);
+      return { ok: true, message: `Deleted task "${t.title}"` };
+    }
+
     default:
       return { ok: false, message: `Unknown action type: ${action.type}` };
   }
@@ -579,6 +646,117 @@ app.delete('/api/invoices/:invId/items/:itemId', (req, res) => {
   res.json(db.invoices.get(req.params.invId));
 });
 
+// ── TASKS (calendar to-dos) ─────────────────────────────────────────────────
+app.get('/api/tasks', (req, res) => {
+  const { from, to, status, type, projectId } = req.query;
+  res.json(db.tasks.all({ from, to, status, type, projectId }));
+});
+
+app.post('/api/tasks', (req, res) => {
+  try { res.status(201).json(db.tasks.create(req.body)); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.put('/api/tasks/:id', (req, res) => {
+  try {
+    const t = db.tasks.update(req.params.id, req.body);
+    if (!t) return res.status(404).json({ error: 'Task not found' });
+    res.json(t);
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.delete('/api/tasks/:id', (req, res) => {
+  db.tasks.delete(req.params.id);
+  res.json({ ok: true });
+});
+
+// ── CALENDAR FEED (.ics) ──────────────────────────────────────────────────────
+// Subscribe to this URL from Google / Outlook / Apple Calendar for a read-only
+// mirror of every open task. Each task becomes an all-day VEVENT on its due date.
+const TASK_TYPE_LABEL = {
+  itb: 'Invitation to Bid', rfq: 'Request for Quote', submittal: 'Submittal',
+  inspection: 'Inspection', deadline: 'Deadline', followup: 'Follow-up', other: 'Task',
+};
+function icsEscape(s) {
+  return String(s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+}
+function toICSDate(d) { return String(d || '').slice(0, 10).replace(/-/g, ''); } // YYYYMMDD
+function nextDay(ymd) {
+  const dt = new Date(ymd + 'T00:00:00Z');
+  dt.setUTCDate(dt.getUTCDate() + 1);
+  return dt.toISOString().slice(0, 10).replace(/-/g, '');
+}
+app.get('/api/calendar.ics', (req, res) => {
+  const projMap = Object.fromEntries(db.projects.all().map(p => [p.id, p.name]));
+  const all = db.tasks.all({ status: req.query.includeDone ? null : 'open' })
+                .filter(t => t.dueDate);                  // only dated items go on a calendar
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const lines = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Apex Contracts//Calendar//EN',
+    'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:Apex Contracts',
+  ];
+  all.forEach(t => {
+    const label = TASK_TYPE_LABEL[t.type] || 'Task';
+    const proj  = t.projectId && projMap[t.projectId] ? ` — ${projMap[t.projectId]}` : (t.client ? ` — ${t.client}` : '');
+    const start = toICSDate(t.dueDate);
+    lines.push(
+      'BEGIN:VEVENT',
+      `UID:${t.id}@apex-contracts`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART;VALUE=DATE:${start}`,
+      `DTEND;VALUE=DATE:${nextDay(t.dueDate.slice(0, 10))}`,
+      `SUMMARY:${icsEscape(`[${label}] ${t.title}${proj}`)}`,
+      `DESCRIPTION:${icsEscape((t.priority === 'high' ? '⚑ HIGH PRIORITY\\n' : '') + (t.notes || ''))}`,
+      `CATEGORIES:${label}`,
+      'END:VEVENT',
+    );
+  });
+  lines.push('END:VCALENDAR');
+  res.set('Content-Type', 'text/calendar; charset=utf-8');
+  res.set('Content-Disposition', 'inline; filename="apex-contracts.ics"');
+  res.send(lines.join('\r\n'));
+});
+
+// ── INBOUND EMAIL → AUTO-TASK ──────────────────────────────────────────────────
+// Point an email-forwarding service (Mailgun routes, SendGrid Inbound Parse,
+// Postmark, CloudMailin, etc.) at:  POST /api/inbound-email?token=<INBOUND_EMAIL_TOKEN>
+// The AI classifies the message; bid invites / RFQs / deadlines become calendar tasks.
+app.post('/api/inbound-email', async (req, res) => {
+  const token = req.query.token || req.headers['x-webhook-token'] || '';
+  if (INBOUND_EMAIL_TOKEN && token !== INBOUND_EMAIL_TOKEN) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  const b = req.body || {};
+  // Normalize the field names the major inbound-parse providers use.
+  const from    = b.from || b.sender || b.From || b.headers?.from || '';
+  const subject = b.subject || b.Subject || b.headers?.subject || '';
+  const body    = b.text || b['body-plain'] || b['stripped-text'] || b.TextBody
+               || b.plain || b.html || b.HtmlBody || b['body-html'] || '';
+  if (!subject && !body) return res.status(400).json({ error: 'Empty email payload' });
+
+  try {
+    const c = await classifyEmail({ from, subject, body });
+    if (!c || !c.isActionable) {
+      console.log(`[INBOUND EMAIL] skipped (not actionable): "${subject}"`);
+      return res.json({ created: false, reason: 'not actionable' });
+    }
+    const task = db.tasks.create({
+      type: c.type || 'other',
+      title: (c.title && c.title.trim()) || subject || 'Untitled task',
+      client: c.client || '',
+      dueDate: c.dueDate || null,
+      priority: c.priority || 'normal',
+      source: 'email',
+      notes: `${c.notes ? c.notes + '\n\n' : ''}From: ${from}\nSubject: ${subject}`,
+    });
+    console.log(`[INBOUND EMAIL] created ${task.type} task "${task.title}"`);
+    res.status(201).json({ created: true, task });
+  } catch (e) {
+    console.error('[INBOUND EMAIL]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── DOCUMENTS (RAG) ───────────────────────────────────────────────────────────
 app.get('/api/projects/:id/documents', async (req, res) => {
   try {
@@ -649,9 +827,10 @@ app.post('/api/chat', async (req, res) => {
   try {
     const projects   = getEnrichedProjects();
     const employees  = db.employees.all();
+    const tasks      = db.tasks.all({ status: 'open' });
 
     const { text, action, ragUsed } = await chat(
-      message, history, projects, employees, projectId
+      message, history, projects, employees, projectId, tasks
     );
 
     let actionResult = null;

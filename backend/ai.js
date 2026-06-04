@@ -41,6 +41,7 @@ const ACTION_TYPES = [
   'add_employee', 'update_employee', 'delete_employee',
   'update_retainage',
   'create_invoice', 'update_invoice', 'set_invoice_status', 'delete_invoice',
+  'add_task', 'update_task', 'complete_task', 'delete_task',
 ];
 
 // Flat schema: a single object with a type enum + every possible field as optional.
@@ -95,6 +96,12 @@ const RESPONSE_SCHEMA = {
             },
           },
         },
+        // calendar task
+        taskType: { type: 'string', enum: ['itb', 'rfq', 'submittal', 'inspection', 'deadline', 'followup', 'other'] },
+        title: { type: 'string' },
+        newTitle: { type: 'string' },
+        taskStatus: { type: 'string', enum: ['open', 'done', 'cancelled'] },
+        priority: { type: 'string', enum: ['low', 'normal', 'high'] },
       },
       required: ['type'],
     },
@@ -103,8 +110,36 @@ const RESPONSE_SCHEMA = {
 };
 
 // ── SYSTEM PROMPT ───────────────────────────────────────────────────────────
-function buildSystemPrompt(projectData, employeeData, ragContext) {
+// Compact, date-aware summary of open tasks injected into the chat prompt so the
+// assistant is always aware of upcoming and overdue deadlines.
+function formatTaskSummary(tasks = []) {
+  if (!Array.isArray(tasks)) return '';
+  const open = tasks.filter(t => t && t.status === 'open');
+  if (open.length === 0) return '';
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const TYPE_LABEL = { itb: 'ITB', rfq: 'RFQ', submittal: 'Submittal', inspection: 'Inspection', deadline: 'Deadline', followup: 'Follow-up', other: 'Task' };
+  const fmtRel = (ymd) => {
+    const d = new Date(ymd + 'T00:00:00'); d.setHours(0, 0, 0, 0);
+    const days = Math.round((d - today) / 86400000);
+    if (days < 0) return `${-days}d OVERDUE`;
+    if (days === 0) return 'due TODAY';
+    if (days === 1) return 'due tomorrow';
+    return `in ${days}d`;
+  };
+  const line = (t) => {
+    const due = t.dueDate ? `${t.dueDate.slice(0, 10)} (${fmtRel(t.dueDate.slice(0, 10))})` : 'no due date';
+    const who = t.client ? ` [${t.client}]` : '';
+    return `- ${TYPE_LABEL[t.type] || 'Task'}: ${t.title} — ${due}${t.priority === 'high' ? ' [HIGH]' : ''}${who}`;
+  };
+  const withDate = open.filter(t => t.dueDate).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  const noDate = open.filter(t => !t.dueDate);
+  const lines = [...withDate, ...noDate].slice(0, 25).map(line);
+  return `\n## Open Tasks / Calendar (today is ${today.toISOString().slice(0, 10)})\nUse these when the user asks what is due, upcoming, overdue, or this week. Each is a calendar to-do (bid invite, RFQ, inspection, deadline, etc.).\n${lines.join('\n')}\n`;
+}
+
+function buildSystemPrompt(projectData, employeeData, ragContext, taskData = []) {
   const hasRag = ragContext && ragContext.trim().length > 0;
+  const taskSummary = formatTaskSummary(taskData);
   return `You are the AI operator for Apex Roofing's contract management system. You manage contracts (projects), expenses (materials & labor), change orders, retainage, employees, and invoices, and you answer questions about profitability and uploaded documents.
 
 You MUST respond with a single JSON object of this exact shape:
@@ -120,7 +155,7 @@ ${JSON.stringify(projectData, null, 2)}
 
 ## Employees
 ${JSON.stringify(employeeData, null, 2)}
-${hasRag ? `\n## Relevant Document Context (from uploaded PDFs)\n${ragContext}\n\nWhen you use this, cite the document filename in your reply.\n` : ''}
+${taskSummary}${hasRag ? `\n## Relevant Document Context (from uploaded PDFs)\n${ragContext}\n\nWhen you use this, cite the document filename in your reply.\n` : ''}
 ## Action types and their fields ( * = required )
 - create_project: name*, client, contractValue, startDate (YYYY-MM-DD), phase (membrane|metal|qc|change|retainage|closed), notes
 - update_project: projectName*, fields { name, client, contractValue, startDate, notes, phase }
@@ -145,6 +180,16 @@ ${hasRag ? `\n## Relevant Document Context (from uploaded PDFs)\n${ragContext}\n
 - update_invoice: projectName* or invoiceNumber*, fields via invoiceNumber/status/issueDate/dueDate/notes/items
 - set_invoice_status: invoiceNumber*, status*
 - delete_invoice: invoiceNumber*
+- add_task: title*, taskType (itb|rfq|submittal|inspection|deadline|followup|other), dueDate (YYYY-MM-DD), projectName, client, priority (low|normal|high), notes
+- update_task: title* (current title to match), newTitle, taskType, dueDate, projectName, client, priority, taskStatus, notes
+- complete_task: title*
+- delete_task: title*
+
+## Task / calendar guidance
+- "Invitation to bid" / "ITB" -> taskType "itb". "Request for quote/pricing" / "RFQ" / "RFP" -> taskType "rfq".
+  Submittals -> "submittal", inspections -> "inspection", a generic deadline -> "deadline", a reminder to follow up -> "followup".
+- A task does NOT need a project. Bid invites and RFQs usually arrive before a contract exists -- leave projectName empty and put the requesting company in "client".
+- Today is ${new Date().toISOString().slice(0, 10)}. Resolve relative dates ("Friday", "next week", "in 3 days") to an absolute YYYY-MM-DD using this.
 
 ## Rules
 - Phases run in order: membrane -> metal -> qc -> change -> retainage -> closed.
@@ -188,7 +233,7 @@ function normalizeResult(parsed, rawFallback) {
 }
 
 // ── PROVIDER CALLS ──────────────────────────────────────────────────────────
-async function callOllama(messages) {
+async function callOllama(messages, format = RESPONSE_SCHEMA) {
   const res = await fetch(`${OLLAMA_HOST}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -200,7 +245,7 @@ async function callOllama(messages) {
                                         // phase loops/stalls under a grammar-constrained
                                         // (format) response, so disable it. We don't need
                                         // chain-of-thought to parse CRUD commands.
-      format: RESPONSE_SCHEMA,          // schema-enforced structured output
+      format,                           // schema-enforced structured output
       options: { temperature: 0.2, top_p: 0.9, num_ctx: NUM_CTX, num_predict: 1024 },
       messages,
     }),
@@ -254,17 +299,17 @@ async function callOpenAI(messages) {
   return data.choices?.[0]?.message?.content || '';
 }
 
-async function callProvider(messages) {
+async function callProvider(messages, format = RESPONSE_SCHEMA) {
   switch (PROVIDER) {
-    case 'anthropic': return callAnthropic(messages);
+    case 'anthropic': return callAnthropic(messages);   // cloud providers rely on the prompt to shape JSON
     case 'openai':    return callOpenAI(messages);
     case 'ollama':
-    default:          return callOllama(messages);
+    default:          return callOllama(messages, format);
   }
 }
 
 // ── MAIN CHAT ───────────────────────────────────────────────────────────────
-async function chat(userMessage, history = [], projectData, employeeData, projectId = null) {
+async function chat(userMessage, history = [], projectData, employeeData, projectId = null, taskData = []) {
   // 1. RAG (non-fatal)
   let ragContext = '';
   let ragUsed = false;
@@ -276,7 +321,7 @@ async function chat(userMessage, history = [], projectData, employeeData, projec
   }
 
   // 2. Build messages
-  const systemPrompt = buildSystemPrompt(projectData, employeeData, ragContext);
+  const systemPrompt = buildSystemPrompt(projectData, employeeData, ragContext, taskData);
   const recentHistory = (history || [])
     .filter(m => m && (m.role === 'user' || m.role === 'assistant') && m.content)
     .slice(-10);
@@ -299,6 +344,54 @@ async function chat(userMessage, history = [], projectData, employeeData, projec
   if (action) console.log('[AI] action:', JSON.stringify(action));
 
   return { text: reply, action, ragUsed };
+}
+
+// ── EMAIL CLASSIFIER (inbound auto-capture) ──────────────────────────────────
+// Decides whether an inbound email should become a calendar task, and extracts
+// the fields. Used by POST /api/inbound-email.
+const EMAIL_CLASSIFY_SCHEMA = {
+  type: 'object',
+  properties: {
+    isActionable: { type: 'boolean' },
+    type:     { type: 'string', enum: ['itb', 'rfq', 'submittal', 'inspection', 'deadline', 'followup', 'other'] },
+    title:    { type: 'string' },
+    client:   { type: 'string' },
+    dueDate:  { type: 'string' },
+    priority: { type: 'string', enum: ['low', 'normal', 'high'] },
+    notes:    { type: 'string' },
+  },
+  required: ['isActionable'],
+};
+
+async function classifyEmail({ from = '', subject = '', body = '' }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const system = `You triage inbound email for a commercial roofing contractor (Apex Roofing) and decide whether it should become a calendar task.
+
+Return ONLY a JSON object: { "isActionable": bool, "type": ..., "title": ..., "client": ..., "dueDate": ..., "priority": ..., "notes": ... }
+
+Set isActionable=true ONLY for mail that implies an action, usually with a date or deadline:
+- invitation to bid -> type "itb"
+- request for quote / pricing / RFP -> type "rfq"
+- submittal request -> "submittal", inspection notice -> "inspection", a stated deadline -> "deadline", a needed follow-up -> "followup"
+Newsletters, receipts, marketing, automated notifications, and FYI-only mail are NOT actionable -> isActionable=false (leave other fields empty).
+
+Fields when actionable:
+- title: short imperative summary, e.g. "Bid -- Westfield HS gym re-roof".
+- client: the sending company / general contractor if identifiable, else "".
+- dueDate: bid/response due date as YYYY-MM-DD if stated or clearly inferable, else "". Today is ${today}.
+- priority: "high" if due within 5 days or marked urgent, otherwise "normal".
+- notes: one or two lines of key detail (location, scope, contact).`;
+  const user = `FROM: ${from}\nSUBJECT: ${subject}\n\n${String(body || '').slice(0, 6000)}`;
+  const messages = [{ role: 'system', content: system }, { role: 'user', content: user }];
+
+  let raw = await callProvider(messages, EMAIL_CLASSIFY_SCHEMA);
+  let parsed = extractJSON(raw);
+  if (!parsed && PROVIDER === 'ollama') {
+    raw = await callProvider(messages, EMAIL_CLASSIFY_SCHEMA);
+    parsed = extractJSON(raw);
+  }
+  if (!parsed || typeof parsed.isActionable !== 'boolean') return { isActionable: false };
+  return parsed;
 }
 
 // ── STARTUP CHECK ─────────────────────────────────────────────────────────────
@@ -341,4 +434,4 @@ function aiInfo() {
   return { provider: PROVIDER, model };
 }
 
-module.exports = { chat, checkEmbedModel, aiInfo };
+module.exports = { chat, checkEmbedModel, aiInfo, classifyEmail };
