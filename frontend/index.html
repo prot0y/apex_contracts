@@ -2290,10 +2290,64 @@ function CalendarPage({ projects, onSelectProject, refreshTick }) {
 }
 
 // ── DASHBOARD ──
+// ── SORTING (dashboard + contracts lists) ──
+const SORT_OPTIONS_CONTRACTS = [
+  { key: 'name', label: 'Name' }, { key: 'client', label: 'Client' }, { key: 'phase', label: 'Phase' },
+  { key: 'contractValue', label: 'Contract value' }, { key: 'startDate', label: 'Start date' },
+  { key: 'changeOrders', label: 'Change orders' }, { key: 'modified', label: 'Date modified' }, { key: 'created', label: 'Date created' },
+];
+const SORT_OPTIONS_DASHBOARD = [
+  { key: 'name', label: 'Name' }, { key: 'client', label: 'Client' }, { key: 'phase', label: 'Phase' },
+  { key: 'revenue', label: 'Revenue' }, { key: 'cost', label: 'Cost' }, { key: 'gross', label: 'Gross profit' },
+  { key: 'margin', label: 'Margin' }, { key: 'modified', label: 'Date modified' }, { key: 'created', label: 'Date created' },
+];
+const sortValue = (p, key, calc) => {
+  switch (key) {
+    case 'client': return (p.client || '').toLowerCase();
+    case 'phase': return PHASES.findIndex(ph => ph.id === p.phase);
+    case 'contractValue': return p.contractValue || 0;
+    case 'startDate': return p.startDate || '';
+    case 'changeOrders': return (p.changeOrders || []).length;
+    case 'modified': return p.updatedAt || p.createdAt || '';
+    case 'created': return p.createdAt || '';
+    case 'revenue': return calc ? calc.totalRevenue : 0;
+    case 'cost': return calc ? calc.totalCost : 0;
+    case 'gross': return calc ? calc.gross : 0;
+    case 'margin': return calc ? calc.margin : 0;
+    default: return (p.name || '').toLowerCase();
+  }
+};
+function sortProjects(list, key, dir, calcs) {
+  const arr = [...list];
+  arr.sort((a, b) => {
+    const ca = calcs && calcs.find(c => c.id === a.id);
+    const cb = calcs && calcs.find(c => c.id === b.id);
+    const va = sortValue(a, key, ca), vb = sortValue(b, key, cb);
+    let cmp = (typeof va === 'string') ? va.localeCompare(vb) : (va - vb);
+    if (cmp === 0) cmp = (a.name || '').localeCompare(b.name || '');
+    return dir === 'asc' ? cmp : -cmp;
+  });
+  return arr;
+}
+function SortControl({ value, dir, onChange, onToggle, options }) {
+  return (
+    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+      <span style={{ fontSize: 12, color: 'var(--text3)' }}>Sort</span>
+      <select className="form-select" style={{ width: 'auto' }} value={value} onChange={e => onChange(e.target.value)}>
+        {options.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+      </select>
+      <button className="btn btn-ghost btn-sm" title={dir === 'asc' ? 'Ascending' : 'Descending'} onClick={onToggle}>{dir === 'asc' ? '↑ Asc' : '↓ Desc'}</button>
+    </div>
+  );
+}
+
 function Dashboard({ projects, employees, onSelectProject, refreshTick, onGoCalendar }) {
   const [tasks, setTasks] = useState([]);
   React.useEffect(() => { fetch('/api/tasks?status=open').then(r => r.json()).then(setTasks).catch(() => {}); }, [refreshTick]);
   const calcs = useMemo(() => projects.map(p => ({ ...calcProject(p, employees), id: p.id })), [projects, employees]);
+  const [sortKey, setSortKey] = useState('name');
+  const [sortDir, setSortDir] = useState('asc');
+  const sortedProjects = useMemo(() => sortProjects(projects, sortKey, sortDir, calcs), [projects, sortKey, sortDir, calcs]);
   const totalRevenue = calcs.reduce((s, c) => s + c.totalRevenue, 0);
   const totalCost = calcs.reduce((s, c) => s + c.totalCost, 0);
   const totalGross = totalRevenue - totalCost;
@@ -2390,7 +2444,10 @@ function Dashboard({ projects, employees, onSelectProject, refreshTick, onGoCale
         </div>
 
         {/* Top projects by margin */}
-        <div style={{ marginBottom: 8, fontSize: 11, letterSpacing: 2, color: 'var(--text3)', fontFamily: 'DM Mono', textTransform: 'uppercase', marginTop: 4 }}>Job Profitability</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, marginTop: 4 }}>
+          <div style={{ fontSize: 11, letterSpacing: 2, color: 'var(--text3)', fontFamily: 'DM Mono', textTransform: 'uppercase' }}>Job Profitability</div>
+          <SortControl value={sortKey} dir={sortDir} options={SORT_OPTIONS_DASHBOARD} onChange={setSortKey} onToggle={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')} />
+        </div>
         <div className="table-wrap">
           <table>
             <thead>
@@ -2399,7 +2456,7 @@ function Dashboard({ projects, employees, onSelectProject, refreshTick, onGoCale
               </tr>
             </thead>
             <tbody>
-              {projects.map(p => {
+              {sortedProjects.map(p => {
                 const c = calcs.find(c => c.id === p.id);
                 return (
                   <tr key={p.id} onClick={() => onSelectProject(p)}>
@@ -2435,12 +2492,16 @@ function ContractsPage({ projects, employees, onSelectProject, onAddProject, onD
   const [search, setSearch] = useState('');
   const [phaseFilter, setPhaseFilter] = useState('all');
   const [showAdd, setShowAdd] = useState(false);
+  const [sortKey, setSortKey] = useState('name');
+  const [sortDir, setSortDir] = useState('asc');
 
   const filtered = projects.filter(p => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.client.toLowerCase().includes(search.toLowerCase());
     const matchPhase = phaseFilter === 'all' || p.phase === phaseFilter;
     return matchSearch && matchPhase;
   });
+
+  const sorted = sortProjects(filtered, sortKey, sortDir);
 
   return (
     <div>
@@ -2459,16 +2520,17 @@ function ContractsPage({ projects, employees, onSelectProject, onAddProject, onD
               <option value="all">All Phases</option>
               {PHASES.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
             </select>
+            <SortControl value={sortKey} dir={sortDir} options={SORT_OPTIONS_CONTRACTS} onChange={setSortKey} onToggle={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')} />
           </div>
           <table>
             <thead>
               <tr><th>Project</th><th>Phase</th><th>Contract Value</th><th>Change Orders</th><th>Start Date</th><th></th></tr>
             </thead>
             <tbody>
-              {filtered.length === 0 && (
+              {sorted.length === 0 && (
                 <tr><td colSpan={5}><div className="empty-state"><div className="empty-state-icon">📋</div><div className="empty-state-text">No contracts found</div><div className="empty-state-sub">Try adjusting your search or filter</div></div></td></tr>
               )}
-              {filtered.map(p => {
+              {sorted.map(p => {
                 const approvedCOs = p.changeOrders.filter(co => co.approved).reduce((s, co) => s + co.amount, 0);
                 return (
                   <tr key={p.id} onClick={() => onSelectProject(p)} style={{ cursor: 'pointer' }}>
@@ -2894,7 +2956,7 @@ function App() {
           ))}
         </nav>
         <div className="sidebar-footer">
-          v2.0.1 · Build
+          v2.1.0 · Build
         </div>
       </div>
 
