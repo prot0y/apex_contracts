@@ -16,25 +16,25 @@
     --surface3: #dddddf;
     --border: #d0d0d3;
     --border2: #b9b9bd;
-    --accent: #52525b;
-    --accent2: #6b7280;
-    --accent-dim: rgba(82,82,91,0.08);
-    --accent-glow: rgba(82,82,91,0.22);
+    --accent: #1a6cff;
+    --accent2: #4488ff;
+    --accent-dim: rgba(26,108,255,0.08);
+    --accent-glow: rgba(26,108,255,0.22);
     --text: #1c1c1e;
     --text2: #57575c;
     --text3: #8e8e93;
-    --green: #6b7280;
-    --green-dim: rgba(107,114,128,0.10);
-    --red: #3f3f46;
-    --red-dim: rgba(63,63,70,0.09);
-    --blue: #52525b;
-    --blue-dim: rgba(82,82,91,0.09);
-    --phase-membrane: #3f3f46;
-    --phase-metal: #52525b;
-    --phase-qc: #6b7280;
-    --phase-change: #7c7c85;
-    --phase-retainage: #5b5b62;
-    --phase-closed: #9ca3af;
+    --green: #0a8a4e;
+    --green-dim: rgba(10,138,78,0.10);
+    --red: #d42b2b;
+    --red-dim: rgba(212,43,43,0.09);
+    --blue: #1a6cff;
+    --blue-dim: rgba(26,108,255,0.09);
+    --phase-membrane: #7c3aed;
+    --phase-metal: #0e6cc4;
+    --phase-qc: #0a8a6e;
+    --phase-change: #c25c00;
+    --phase-retainage: #b81c1c;
+    --phase-closed: #0a7a3a;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -51,8 +51,8 @@
     position: fixed;
     inset: 0;
     background-image:
-      linear-gradient(rgba(82,82,91,0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(82,82,91,0.04) 1px, transparent 1px);
+      linear-gradient(rgba(26,108,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(26,108,255,0.04) 1px, transparent 1px);
     background-size: 40px 40px;
     pointer-events: none;
     z-index: 0;
@@ -124,7 +124,7 @@
   .nav-item.active {
     background: var(--accent-dim);
     color: var(--accent);
-    border-color: rgba(82,82,91,0.2);
+    border-color: rgba(26,108,255,0.2);
   }
   .nav-icon { font-size: 16px; width: 18px; text-align: center; }
 
@@ -179,8 +179,8 @@
     border: 1px solid var(--border2);
   }
   .btn-ghost:hover { background: var(--surface3); color: var(--text); }
-  .btn-danger { background: var(--red-dim); color: var(--red); border: 1px solid rgba(63,63,70,0.25); }
-  .btn-danger:hover { background: rgba(63,63,70,0.2); }
+  .btn-danger { background: var(--red-dim); color: var(--red); border: 1px solid rgba(231,76,60,0.25); }
+  .btn-danger:hover { background: rgba(231,76,60,0.2); }
   .btn-sm { padding: 6px 12px; font-size: 12px; }
 
   .content { padding: 28px 36px; }
@@ -324,17 +324,17 @@
     white-space: nowrap;
   }
   .pb-dot { width: 6px; height: 6px; border-radius: 50%; }
-  .ph-membrane { background: rgba(82,82,91,0.15); color: #6b7280; }
+  .ph-membrane { background: rgba(142,68,173,0.15); color: #c39bd3; }
   .ph-membrane .pb-dot { background: var(--phase-membrane); }
-  .ph-metal { background: rgba(82,82,91,0.15); color: #71717a; }
+  .ph-metal { background: rgba(41,128,185,0.15); color: #7fb3d3; }
   .ph-metal .pb-dot { background: var(--phase-metal); }
-  .ph-qc { background: rgba(82,82,91,0.15); color: #71717a; }
+  .ph-qc { background: rgba(22,160,133,0.15); color: #76d7c4; }
   .ph-qc .pb-dot { background: var(--phase-qc); }
-  .ph-change { background: rgba(82,82,91,0.15); color: #7c7c85; }
+  .ph-change { background: rgba(230,126,34,0.15); color: #f0b27a; }
   .ph-change .pb-dot { background: var(--phase-change); }
-  .ph-retainage { background: rgba(82,82,91,0.15); color: #6b7280; }
+  .ph-retainage { background: rgba(192,57,43,0.15); color: #ec7063; }
   .ph-retainage .pb-dot { background: var(--phase-retainage); }
-  .ph-closed { background: rgba(82,82,91,0.15); color: #9ca3af; }
+  .ph-closed { background: rgba(39,174,96,0.15); color: #82e0aa; }
   .ph-closed .pb-dot { background: var(--phase-closed); }
 
   /* ── PROGRESS BAR ── */
@@ -529,12 +529,12 @@
     transition: all 0.15s;
   }
   .phase-step:hover { border-color: var(--accent); color: var(--text2); }
-  .phase-step.done { background: var(--green-dim); border-color: rgba(107,114,128,0.3); color: var(--green); }
-  .phase-step.current { background: var(--accent-dim); border-color: rgba(140,140,150,0.4); color: var(--accent); font-weight: 600; }
+  .phase-step.done { background: var(--green-dim); border-color: rgba(46,204,113,0.3); color: var(--green); }
+  .phase-step.current { background: var(--accent-dim); border-color: rgba(232,160,32,0.4); color: var(--accent); font-weight: 600; }
 
   /* Tag for change orders */
   .tag { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-family: 'DM Mono', monospace; }
-  .tag-orange { background: rgba(82,82,91,0.15); color: #7c7c85; }
+  .tag-orange { background: rgba(230,126,34,0.15); color: #f0b27a; }
   .tag-green { background: var(--green-dim); color: var(--green); }
   .tag-red { background: var(--red-dim); color: var(--red); }
   .tag-blue { background: var(--blue-dim); color: var(--blue); }
@@ -551,7 +551,7 @@
   .retainage-fill {
     height: 100%;
     border-radius: 4px;
-    background: linear-gradient(90deg, var(--green), #71717a);
+    background: linear-gradient(90deg, var(--green), #1abc9c);
     transition: width 0.4s;
   }
   .retainage-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; margin-top: 4px; }
@@ -624,21 +624,21 @@
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent), #6b7280);
+    background: linear-gradient(135deg, var(--accent), #a855f7);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 13px;
     flex-shrink: 0;
-    box-shadow: 0 0 12px rgba(82,82,91,0.35);
+    box-shadow: 0 0 12px rgba(26,108,255,0.35);
     animation: orbPulse 3s ease-in-out infinite;
   }
   .ai-orb.thinking {
     animation: orbSpin 1s linear infinite;
   }
   @keyframes orbPulse {
-    0%, 100% { box-shadow: 0 0 10px rgba(82,82,91,0.3); }
-    50% { box-shadow: 0 0 20px rgba(82,82,91,0.6), 0 0 40px rgba(107,114,128,0.2); }
+    0%, 100% { box-shadow: 0 0 10px rgba(26,108,255,0.3); }
+    50% { box-shadow: 0 0 20px rgba(26,108,255,0.6), 0 0 40px rgba(168,85,247,0.2); }
   }
   @keyframes orbSpin {
     from { filter: hue-rotate(0deg); }
@@ -664,7 +664,7 @@
     gap: 5px;
     padding: 3px 9px;
     background: var(--accent-dim);
-    border: 1px solid rgba(82,82,91,0.2);
+    border: 1px solid rgba(26,108,255,0.2);
     border-radius: 20px;
     font-size: 10px;
     font-family: 'DM Mono', monospace;
@@ -733,7 +733,7 @@
 
   .ai-msg.system .ai-msg-bubble {
     background: var(--green-dim);
-    border: 1px solid rgba(107,114,128,0.2);
+    border: 1px solid rgba(10,138,78,0.2);
     color: var(--green);
     font-family: 'DM Mono', monospace;
     font-size: 12px;
@@ -743,7 +743,7 @@
 
   .ai-msg.error .ai-msg-bubble {
     background: var(--red-dim);
-    border: 1px solid rgba(63,63,70,0.2);
+    border: 1px solid rgba(212,43,43,0.2);
     color: var(--red);
     font-size: 12px;
     border-radius: 8px;
@@ -751,7 +751,7 @@
 
   .ai-msg.rag .ai-msg-bubble {
     background: var(--blue-dim);
-    border: 1px solid rgba(82,82,91,0.2);
+    border: 1px solid rgba(26,108,255,0.2);
     color: var(--blue);
     font-family: 'DM Mono', monospace;
     font-size: 11px;
@@ -1164,7 +1164,7 @@ function AddProjectModal({ onClose, onAdd, employees }) {
           </div>
         </div>
         <div className="modal-footer">
-          {error && <span style={{ color: '#3f3f46', fontSize: 13, flex: 1 }}>{error}</span>}
+          {error && <span style={{ color: '#e74c3c', fontSize: 13, flex: 1 }}>{error}</span>}
           <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
           <button className="btn btn-primary" onClick={handle}>Create Contract →</button>
         </div>
@@ -1648,7 +1648,7 @@ function ProjectDetail({ project, employees, onClose, onUpdate, onDelete }) {
               <ContractDetailsEditor project={project} onUpdate={onUpdate} />
 
               {pendingCOs > 0 && (
-                <div style={{ background: 'rgba(124,124,133,0.08)', border: '1px solid rgba(124,124,133,0.25)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#7c7c85', display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ background: 'rgba(230,126,34,0.08)', border: '1px solid rgba(230,126,34,0.25)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#f0b27a', display: 'flex', justifyContent: 'space-between' }}>
                   <span>⚠ Pending change orders awaiting approval</span>
                   <strong>{fmt(pendingCOs)}</strong>
                 </div>
@@ -1942,7 +1942,7 @@ function ProjectDetail({ project, employees, onClose, onUpdate, onDelete }) {
                   </table>
                 </div>
               </div>
-              <div style={{ background: 'var(--accent-dim)', border: '1px solid rgba(82,82,91,0.2)', borderRadius: 8, padding: '12px 14px', fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
+              <div style={{ background: 'var(--accent-dim)', border: '1px solid rgba(26,108,255,0.2)', borderRadius: 8, padding: '12px 14px', fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
                 <strong style={{ color: 'var(--accent)' }}>How it works:</strong> Uploaded PDFs are split into chunks and embedded using <code style={{ background: 'var(--surface3)', padding: '1px 5px', borderRadius: 3 }}>nomic-embed-text</code> on your Ollama instance. When you ask the AI assistant a question, it automatically searches these documents and injects the most relevant sections into the prompt — no extra steps needed.
               </div>
             </>
@@ -2039,12 +2039,12 @@ function EmployeesPage({ employees, onAddEmployee, onDeleteEmployee, onUpdateEmp
 
 // ── CALENDAR ──────────────────────────────────────────────────────────────
 const TASK_TYPES = [
-  { id: 'itb',        label: 'Invitation to Bid', short: 'ITB',    color: '#52525b' },
-  { id: 'rfq',        label: 'Request for Quote', short: 'RFQ',    color: '#6b7280' },
-  { id: 'submittal',  label: 'Submittal',         short: 'SUB',    color: '#6b7280' },
-  { id: 'inspection', label: 'Inspection',        short: 'INSP',   color: '#71717a' },
-  { id: 'deadline',   label: 'Deadline',          short: 'DUE',    color: '#3f3f46' },
-  { id: 'followup',   label: 'Follow-up',         short: 'F/U',    color: '#7c7c85' },
+  { id: 'itb',        label: 'Invitation to Bid', short: 'ITB',    color: '#1a6cff' },
+  { id: 'rfq',        label: 'Request for Quote', short: 'RFQ',    color: '#8b5cf6' },
+  { id: 'submittal',  label: 'Submittal',         short: 'SUB',    color: '#0a8a4e' },
+  { id: 'inspection', label: 'Inspection',        short: 'INSP',   color: '#0891b2' },
+  { id: 'deadline',   label: 'Deadline',          short: 'DUE',    color: '#d42b2b' },
+  { id: 'followup',   label: 'Follow-up',         short: 'F/U',    color: '#d97706' },
   { id: 'other',      label: 'Other',             short: 'TASK',   color: '#8e8e93' },
 ];
 const TYPE_META = Object.fromEntries(TASK_TYPES.map(t => [t.id, t]));
@@ -2829,8 +2829,8 @@ Rules:
         <div className="ai-subtitle">Natural language contract management</div>
         <div className="ai-model-badge">
           <span className="ai-model-dot" style={{
-            background: connected === null ? '#8c8c95' : connected ? '#6b7280' : '#3f3f46',
-            boxShadow: connected === null ? '0 0 6px #8c8c95' : connected ? '0 0 6px #6b7280' : '0 0 6px #3f3f46',
+            background: connected === null ? '#f59e0b' : connected ? '#16a34a' : '#dc2626',
+            boxShadow: connected === null ? '0 0 6px #f59e0b' : connected ? '0 0 6px #16a34a' : '0 0 6px #dc2626',
           }} />
           {connected === null ? 'Connecting...' : connected ? (aiInfo?.model || 'AI ready') : 'Offline — check Ollama'}
         </div>
@@ -2944,7 +2944,7 @@ function App() {
           ))}
         </nav>
         <div className="sidebar-footer">
-          v2.2.2
+          v2.2.3
         </div>
       </div>
 
