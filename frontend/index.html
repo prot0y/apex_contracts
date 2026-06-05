@@ -607,6 +607,64 @@
     box-shadow: -2px 0 12px rgba(0,0,0,0.06);
   }
 
+  .ai-header-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 4px;
+  }
+  .ai-header-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text2);
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+  }
+  .ai-header-btn:hover { background: var(--surface3); color: var(--text); }
+
+  .ai-sidebar.minimized {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 280px;
+    min-width: 0;
+    height: auto;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.18);
+    z-index: 50;
+    overflow: hidden;
+  }
+  .ai-sidebar.minimized .ai-sidebar-header { border-bottom: none; }
+
+  .ai-launcher {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #a855f7);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 20px rgba(26,108,255,0.4);
+    z-index: 50;
+    transition: transform 0.15s;
+  }
+  .ai-launcher:hover { transform: scale(1.08); }
+
   .ai-sidebar-header {
     padding: 20px 20px 16px;
     border-bottom: 1px solid var(--border);
@@ -2573,6 +2631,8 @@ function AIChatSidebar({ projects, employees, onAddProject, onUpdateProject, onA
   const [aiInfo, setAiInfo] = useState(null);       // { provider, model } from /api/health
   const messagesEndRef = React.useRef(null);
   const textareaRef = React.useRef(null);
+  const [open, setOpen] = useState(true);
+  const [minimized, setMinimized] = useState(false);
 
   // Check connectivity on mount and every 30s
   React.useEffect(() => {
@@ -2820,13 +2880,22 @@ Rules:
   };
 
   return (
-    <div className="ai-sidebar">
+    <>
+    {!open && (
+      <button className="ai-launcher" onClick={() => { setOpen(true); setMinimized(false); }} title="Open AI Assistant">✦</button>
+    )}
+    {open && (
+    <div className={`ai-sidebar ${minimized ? 'minimized' : ''}`}>
       <div className="ai-sidebar-header">
         <div className="ai-sidebar-title">
           <div className={`ai-orb ${thinking ? 'thinking' : ''}`}>✦</div>
           <div className="ai-title-text">AI ASSISTANT</div>
+          <div className="ai-header-actions">
+            <button className="ai-header-btn" onClick={() => setMinimized(m => !m)} title={minimized ? 'Expand' : 'Minimize'}>{minimized ? '▢' : '–'}</button>
+            <button className="ai-header-btn" onClick={() => setOpen(false)} title="Close">×</button>
+          </div>
         </div>
-        <div className="ai-subtitle">Natural language contract management</div>
+        {!minimized && <div className="ai-subtitle">Natural language contract management</div>}
         <div className="ai-model-badge">
           <span className="ai-model-dot" style={{
             background: connected === null ? '#f59e0b' : connected ? '#16a34a' : '#dc2626',
@@ -2836,7 +2905,7 @@ Rules:
         </div>
       </div>
 
-      <div className="ai-messages">
+      {!minimized && (<div className="ai-messages">
         {messages.map((msg, i) => (
           <div key={i} className={`ai-msg ${msg.role}`}>
             {(msg.role === 'user' || msg.role === 'assistant') &&
@@ -2851,9 +2920,9 @@ Rules:
           </div>
         )}
         <div ref={messagesEndRef} />
-      </div>
+      </div>)}
 
-      {showSuggestions && (
+      {!minimized && showSuggestions && (
         <div className="ai-suggestions">
           <div className="ai-suggestion-label">TRY ASKING</div>
           {SUGGESTIONS.slice(0, 3).map((s, i) => (
@@ -2862,7 +2931,7 @@ Rules:
         </div>
       )}
 
-      <div className="ai-input-area">
+      {!minimized && (<div className="ai-input-area">
         <div className="ai-input-row">
           <textarea
             ref={textareaRef}
@@ -2879,8 +2948,10 @@ Rules:
           </button>
         </div>
         <div className="ai-hint">Enter to send · Shift+Enter for new line</div>
-      </div>
+      </div>)}
     </div>
+    )}
+    </>
   );
 }
 
@@ -2944,7 +3015,7 @@ function App() {
           ))}
         </nav>
         <div className="sidebar-footer">
-          v2.2.3
+          v2.2.4
         </div>
       </div>
 
