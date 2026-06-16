@@ -2956,6 +2956,36 @@ Rules:
 }
 
 // ── APP ROOT ──
+
+const ToolsPage = () => (
+  <div>
+    <div className="page-header">
+      <div>
+        <div className="page-title">Tools</div>
+        <div className="page-subtitle">Estimation &amp; calculation tools</div>
+      </div>
+    </div>
+    <div className="content">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16, marginTop: 8 }}>
+        <a href="/tapered-iso-calculator.html" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+          <div className="stat-card" style={{ cursor: 'pointer', transition: 'all 0.15s' }}
+               onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
+               onMouseLeave={e => e.currentTarget.style.borderColor = ''}>
+            <div style={{ fontSize: 28, marginBottom: 10 }}>📐</div>
+            <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)', marginBottom: 4 }}>Tapered ISO Calculator</div>
+            <div style={{ fontSize: 12, color: 'var(--text3)', lineHeight: 1.5 }}>
+              Calculate Q panel and 2&quot; fill board quantities for field taper and cricket assemblies. 1/2&quot;/ft system.
+            </div>
+            <div style={{ marginTop: 12, fontSize: 11, color: 'var(--accent)', fontFamily: 'DM Mono, monospace', letterSpacing: 1 }}>
+              OPEN TOOL →
+            </div>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+);
+
 function App() {
   const [page, setPage] = useState('dashboard');
   const [projects, setProjects] = useState([]);
@@ -3002,6 +3032,7 @@ function App() {
             { id: 'dashboard', icon: '◈', label: 'Dashboard' },
             { id: 'contracts', icon: '◻', label: 'Contracts' },
             { id: 'calendar', icon: '▦', label: 'Calendar' },
+            { id: 'tools', icon: '⚒️', label: 'Tools' },
             { id: 'employees', icon: '◎', label: 'Employees' },
           ].map(item => (
             <div
