@@ -2961,8 +2961,8 @@ const ToolsPage = () => (
   <div>
     <div className="page-header">
       <div>
-        <div className="page-title">Tools</div>
-        <div className="page-subtitle">Estimation &amp; calculation tools</div>
+        <div className="page-title">TOOLS</div>
+        <div className="page-subtitle">Estimation and calculation tools</div>
       </div>
     </div>
     <div className="content">
@@ -2974,7 +2974,7 @@ const ToolsPage = () => (
             <div style={{ fontSize: 28, marginBottom: 10 }}>📐</div>
             <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)', marginBottom: 4 }}>Tapered ISO Calculator</div>
             <div style={{ fontSize: 12, color: 'var(--text3)', lineHeight: 1.5 }}>
-              Calculate Q panel and 2&quot; fill board quantities for field taper and cricket assemblies. 1/2&quot;/ft system.
+              Q panel and 2" fill board quantities for field taper and cricket assemblies at 1/2"/ft.
             </div>
             <div style={{ marginTop: 12, fontSize: 11, color: 'var(--accent)', fontFamily: 'DM Mono, monospace', letterSpacing: 1 }}>
               OPEN TOOL →
@@ -3032,7 +3032,7 @@ function App() {
             { id: 'dashboard', icon: '◈', label: 'Dashboard' },
             { id: 'contracts', icon: '◻', label: 'Contracts' },
             { id: 'calendar', icon: '▦', label: 'Calendar' },
-            { id: 'tools', icon: '⚒️', label: 'Tools' },
+            { id: 'tools', icon: '🔧', label: 'Tools' },
             { id: 'employees', icon: '◎', label: 'Employees' },
           ].map(item => (
             <div
@@ -3054,6 +3054,8 @@ function App() {
         {page === 'dashboard' && <Dashboard projects={projects} employees={employees} onSelectProject={setSelectedProject} refreshTick={refreshTick} onGoCalendar={() => setPage('calendar')} />}
         {page === 'contracts' && <ContractsPage projects={projects} employees={employees} onSelectProject={setSelectedProject} onAddProject={addProject} onDeleteProject={deleteProject} />}
         {page === 'calendar' && <CalendarPage projects={projects} onSelectProject={setSelectedProject} refreshTick={refreshTick} />}
+        {page === 'tools' && <ToolsPage /> }
+        {page === 'tools' && <ToolsPage /> }
         {page === 'employees' && <EmployeesPage employees={employees} onAddEmployee={addEmployee} onDeleteEmployee={deleteEmployee} onUpdateEmployee={updateEmployee} />}
       </div>
 
