@@ -2967,7 +2967,7 @@ const ToolsPage = () => (
     </div>
     <div className="content">
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16, marginTop: 8 }}>
-        <a href="/tapered-iso-calculator.html" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+        <a href="/tapered-iso-calculator.html" onClick={e => { e.preventDefault(); window.open('/tapered-iso-calculator.html', '_blank'); }} style={{ textDecoration: 'none' }}>
           <div className="stat-card" style={{ cursor: 'pointer', transition: 'all 0.15s' }}
                onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
                onMouseLeave={e => e.currentTarget.style.borderColor = ''}>
