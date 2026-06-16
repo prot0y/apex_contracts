@@ -2984,9 +2984,7 @@ const ToolsPage = () => (
             </div>
             <div style={{ fontSize: 12, color: 'var(--accent)', fontFamily: 'DM Mono, monospace' }}>→</div>
           </div>
-          <div
-            style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', cursor: 'pointer', transition: 'background 0.12s', opacity: 0.45 }}
-          >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', opacity: 0.45 }}>
             <div style={{ fontSize: 24 }}>🧮</div>
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>STACK CT Assembly Reference</div>
@@ -3067,9 +3065,7 @@ function App() {
       <div className="main">
         {page === 'dashboard' && <Dashboard projects={projects} employees={employees} onSelectProject={setSelectedProject} refreshTick={refreshTick} onGoCalendar={() => setPage('calendar')} />}
         {page === 'contracts' && <ContractsPage projects={projects} employees={employees} onSelectProject={setSelectedProject} onAddProject={addProject} onDeleteProject={deleteProject} />}
-        {page === 'calendar' && <CalendarPage projects={projects} onSelectProject={setSelectedProject} refreshTick={refreshTick} />}
-        {page === 'tools' && <ToolsPage /> }
-        {page === 'tools' && <ToolsPage /> }
+        {page === 'calendar' && <CalendarPage projects={projects} onSelectProject={setSelectedProject} refreshTick={refreshTick} />}        {page === 'tools' && <ToolsPage /> }
         {page === 'employees' && <EmployeesPage employees={employees} onAddEmployee={addEmployee} onDeleteEmployee={deleteEmployee} onUpdateEmployee={updateEmployee} />}
       </div>
 
