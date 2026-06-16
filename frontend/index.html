@@ -2966,21 +2966,35 @@ const ToolsPage = () => (
       </div>
     </div>
     <div className="content">
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16, marginTop: 8 }}>
-        <a href="/tapered-iso-calculator.html" onClick={e => { e.preventDefault(); window.open('/tapered-iso-calculator.html', '_blank'); }} style={{ textDecoration: 'none' }}>
-          <div className="stat-card" style={{ cursor: 'pointer', transition: 'all 0.15s' }}
-               onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
-               onMouseLeave={e => e.currentTarget.style.borderColor = ''}>
-            <div style={{ fontSize: 28, marginBottom: 10 }}>📐</div>
-            <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)', marginBottom: 4 }}>Tapered ISO Calculator</div>
-            <div style={{ fontSize: 12, color: 'var(--text3)', lineHeight: 1.5 }}>
-              Q panel and 2" fill board quantities for field taper and cricket assemblies at 1/2"/ft.
+      <div className="section-card" style={{ maxWidth: 480 }}>
+        <div className="section-card-header">
+          <div className="section-card-title">Insulation Calculators</div>
+        </div>
+        <div className="section-card-body" style={{ padding: 0 }}>
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.12s' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
+            onMouseLeave={e => e.currentTarget.style.background = ''}
+            onClick={() => window.open('/tapered-iso-calculator.html', '_blank')}
+          >
+            <div style={{ fontSize: 24 }}>📐</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>Tapered ISO Calculator</div>
+              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>Q panel + 2" fill quantities for field taper and cricket assemblies at 1/2"/ft</div>
             </div>
-            <div style={{ marginTop: 12, fontSize: 11, color: 'var(--accent)', fontFamily: 'DM Mono, monospace', letterSpacing: 1 }}>
-              OPEN TOOL →
-            </div>
+            <div style={{ fontSize: 12, color: 'var(--accent)', fontFamily: 'DM Mono, monospace' }}>→</div>
           </div>
-        </a>
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', cursor: 'pointer', transition: 'background 0.12s', opacity: 0.45 }}
+          >
+            <div style={{ fontSize: 24 }}>🧮</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>STACK CT Assembly Reference</div>
+              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>Formula reference for field taper and cricket assemblies — coming soon</div>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'DM Mono, monospace' }}>SOON</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>

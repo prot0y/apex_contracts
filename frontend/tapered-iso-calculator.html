@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tapered ISO Calculator — Star-Astro</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#f0f4f8;--surface:#ffffff;--surface2:#f5f7fa;--border:#dde3ec;--border2:#c8d0de;
+    --accent:#2563eb;--accent-h:#1d4ed8;--accent-lt:rgba(37,99,235,0.08);
+    --text:#1a202c;--text2:#4a5568;--text3:#718096;
+    --amber:#f59e0b;--amber-bg:rgba(245,158,11,0.1);
+    --shadow-sm:0 1px 3px rgba(0,0,0,0.08),0 1px 2px rgba(0,0,0,0.04);
+  }
+  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.6}
+  .app-shell{display:flex;min-height:100vh}
+  .sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;bottom:0}
+  .sidebar-logo{padding:20px 16px 16px;border-bottom:1px solid var(--border)}
+  .sidebar-logo img{width:100%;max-width:176px;display:block}
+  .sidebar-label{font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);padding:18px 16px 6px}
+  .sidebar-nav{padding:0 8px}
+  .nav-item{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:6px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;transition:all 0.12s;border:none;background:none;width:100%;text-align:left}
+  .nav-item:hover{background:var(--surface2);color:var(--text)}
+  .nav-item.active{background:var(--accent-lt);color:var(--accent)}
+  .nav-icon{width:16px;height:16px;flex-shrink:0;opacity:0.7}
+  .nav-item.active .nav-icon{opacity:1}
+  .sidebar-footer{margin-top:auto;padding:12px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--text3)}
+  .main{margin-left:220px;flex:1;display:flex;flex-direction:column}
+  .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 28px;display:flex;align-items:center;gap:10px}
+  .topbar h1{font-size:16px;font-weight:600;color:var(--text)}
+  .topbar-sub{font-size:13px;color:var(--text3)}
+  .badge{margin-left:auto;font-size:11px;font-weight:600;color:var(--accent);background:var(--accent-lt);border:1px solid rgba(37,99,235,0.2);border-radius:4px;padding:3px 8px;letter-spacing:0.04em;text-transform:uppercase}
+  .content{padding:28px;max-width:860px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:22px 24px;box-shadow:var(--shadow-sm)}
+  .card-title{font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);margin-bottom:16px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:600px){.grid2{grid-template-columns:1fr}}
+  .field{margin-bottom:14px}
+  label{display:block;font-size:12px;font-weight:500;color:var(--text2);margin-bottom:5px}
+  .field-hint{font-size:11px;color:var(--text3);margin-top:4px;line-height:1.4}
+  input[type="number"]{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:14px;padding:9px 11px;outline:none;transition:border-color 0.12s,box-shadow 0.12s;-moz-appearance:textfield}
+  input[type="number"]::-webkit-outer-spin-button,input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none}
+  input[type="number"]:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,0.12);background:var(--surface)}
+  .btn-primary{width:100%;margin-top:6px;padding:10px;background:var(--accent);border:none;border-radius:6px;color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:background 0.12s}
+  .btn-primary:hover{background:var(--accent-h)}
+  .results{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:20px 22px}
+  .results-title{font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);margin-bottom:16px}
+  .result-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+  .result-item{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;box-shadow:var(--shadow-sm)}
+  .result-label{font-size:11px;color:var(--text3);margin-bottom:5px}
+  .result-value{font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:600;color:var(--accent);line-height:1.1}
+  .result-unit{font-size:12px;color:var(--text3);margin-top:2px}
+  .sanity{border-top:1px solid var(--border);padding-top:14px;display:flex;flex-wrap:wrap;gap:14px}
+  .sanity-item{font-size:12px;color:var(--text3)}
+  .sanity-item span{font-family:'IBM Plex Mono',monospace;color:var(--text2);font-weight:500}
+  .warning{font-size:12px;color:var(--amber);background:var(--amber-bg);border:1px solid rgba(245,158,11,0.3);border-radius:6px;padding:9px 12px;margin-top:12px;display:none}
+  .warning.show{display:block}
+  .empty-state{text-align:center;padding:28px 16px;color:var(--text3);font-size:13px}
+  .empty-state svg{width:36px;height:36px;stroke:var(--border2);margin:0 auto 10px;display:block}
+  .formula-ref{margin-top:24px;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+  .formula-ref summary{padding:12px 16px;font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;background:var(--surface);letter-spacing:0.03em;list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none}
+  .formula-ref summary::after{content:'▾';font-size:12px;transition:transform 0.15s}
+  .formula-ref[open] summary::after{transform:rotate(180deg)}
+  .formula-body{padding:16px;background:var(--surface2);font-size:12px;color:var(--text3);line-height:1.9;border-top:1px solid var(--border)}
+  .formula-body strong{color:var(--text2);font-weight:600}
+  .formula-body code{font-family:'IBM Plex Mono',monospace;font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:2px 6px;color:var(--accent);display:block;margin:4px 0 10px;word-break:break-all}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <img src="https://star-astro.com/wp-content/uploads/StarAstroLogo.png" alt="Star-Astro">
+    </div>
+    <div class="sidebar-label">Tools</div>
+    <div class="sidebar-nav">
+      <button class="nav-item active" onclick="switchPanel('field',this)">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3,20 12,4 21,20"/><line x1="3" y1="20" x2="21" y2="20"/></svg>
+        Field Taper
+      </button>
+      <button class="nav-item" onclick="switchPanel('cricket',this)">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12,3 3,21 21,21"/><line x1="7.5" y1="21" x2="12" y2="12"/><line x1="12" y1="12" x2="16.5" y2="21"/></svg>
+        Cricket Taper
+      </button>
+    </div>
+    <div class="sidebar-footer">Q Panel &middot; 1/2&quot;/ft &middot; 2&quot; Fill</div>
+  </nav>
+  <div class="main">
+    <div class="topbar">
+      <h1>Tapered ISO Calculator</h1>
+      <span class="topbar-sub">Polyisocyanurate insulation estimating</span>
+      <span class="badge">Star-Astro</span>
+    </div>
+    <div class="content">
+      <!-- FIELD -->
+      <div id="panel-field">
+        <div class="grid2">
+          <div class="card">
+            <div class="card-title">Field Taper &mdash; Inputs</div>
+            <div class="field"><label>Measured area (SF)</label><input type="number" id="f-area" min="0" step="1" placeholder="e.g. 4000"><p class="field-hint">Total area of the drainage bay</p></div>
+            <div class="field"><label>Taper run length (ft)</label><input type="number" id="f-run" min="0" step="0.5" placeholder="e.g. 30"><p class="field-hint">Drain or gutter to high point — slope direction only. For four-way bays use drain to farthest high point, not drain-to-drain.</p></div>
+            <div class="field"><label>Waste %</label><input type="number" id="f-waste" min="0" max="50" step="1" value="10"><p class="field-hint">Typically 10&ndash;15% for field taper</p></div>
+            <button class="btn-primary" onclick="calcField()">Calculate</button>
+          </div>
+          <div id="field-results"><div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><polygon points="3,20 12,4 21,20"/><line x1="3" y1="20" x2="21" y2="20"/></svg>Enter measurements and click Calculate</div></div>
+        </div>
+        <details class="formula-ref">
+          <summary>STACK CT Formula Reference &mdash; Assembly 1: Field Taper</summary>
+          <div class="formula-body">
+            <strong>Q Tapered Panel (0.5&quot;&ndash;2.5&quot;, 4&times;4) &mdash; each</strong>
+            <code>roundup([MeasuredArea]/16*(1+[WastePercent0to100]/100),0)</code>
+            <strong>2&quot; Flat Fill (4&times;8) &mdash; each</strong>
+            <code>roundup(max(0,0.25*[TaperRunFeet]-1)*[MeasuredArea]/2/32*(1+[WastePercent0to100]/100),0)</code>
+            Fill threshold: run &gt; 4&apos; &middot; Avg buildup = &frac12; peak &middot; Peak = 0.5&quot; + (0.5 &times; run)
+          </div>
+        </details>
+      </div>
+      <!-- CRICKET -->
+      <div id="panel-cricket" style="display:none">
+        <div class="grid2">
+          <div class="card">
+            <div class="card-title">Cricket Taper &mdash; Inputs</div>
+            <div class="field"><label>Measured area (SF)</label><input type="number" id="c-area" min="0" step="1" placeholder="e.g. 368"><p class="field-hint">Total area of all crickets in this group</p></div>
+            <div class="field"><label>Cricket run length (ft)</label><input type="number" id="c-run" min="0" step="0.5" placeholder="e.g. 16"><p class="field-hint">Low point to cricket ridge. For wall saddles = HALF the drain-to-drain spacing. NOT the depth off the wall.</p></div>
+            <div class="field"><label>Waste %</label><input type="number" id="c-waste" min="0" max="50" step="1" value="15"><p class="field-hint">Typically 15&ndash;20% for diagonal cricket cuts</p></div>
+            <button class="btn-primary" onclick="calcCricket()">Calculate</button>
+          </div>
+          <div id="cricket-results"><div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><polygon points="3,20 12,4 21,20"/><line x1="3" y1="20" x2="21" y2="20"/></svg>Enter measurements and click Calculate</div></div>
+        </div>
+        <details class="formula-ref">
+          <summary>STACK CT Formula Reference &mdash; Assembly 2: Cricket Taper</summary>
+          <div class="formula-body">
+            <strong>Q Tapered Panel (0.5&quot;&ndash;2.5&quot;, 4&times;4) &mdash; each</strong>
+            <code>roundup([MeasuredArea]/16*(1+[WastePercent0to100]/100),0)</code>
+            <strong>2&quot; Flat Fill (4&times;8) &mdash; each</strong>
+            <code>roundup(max(0,0.167*[CricketRunFeet]-1)*[MeasuredArea]/2/32*(1+[WastePercent0to100]/100),0)</code>
+            Fill threshold: run &gt; 6&apos; &middot; Avg buildup = &frac13; peak &middot; Peak = 0.5&quot; + (0.5 &times; run)
+          </div>
+        </details>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+var activePanel='field';
+function switchPanel(name,btn){
+  document.getElementById('panel-'+activePanel).style.display='none';
+  document.getElementById('panel-'+name).style.display='';
+  document.querySelectorAll('.nav-item').forEach(function(b){b.classList.remove('active')});
+  btn.classList.add('active');
+  activePanel=name;
+}
+function renderResults(container,panels,fill,peakThick,avgFill,warning){
+  var w=warning?'<div class="warning show">&#9888; '+warning+'</div>':'';
+  container.innerHTML='<div class="results"><div class="results-title">Results</div>'+
+    '<div class="result-grid">'+
+    '<div class="result-item"><div class="result-label">Q panels (4&times;4)</div><div class="result-value">'+panels+'</div><div class="result-unit">each</div></div>'+
+    '<div class="result-item"><div class="result-label">2&quot; fill boards (4&times;8)</div><div class="result-value">'+fill+'</div><div class="result-unit">each</div></div>'+
+    '</div><div class="sanity">'+
+    '<div class="sanity-item">Peak thickness <span>'+peakThick+'&quot;</span></div>'+
+    '<div class="sanity-item">Avg fill buildup <span>'+avgFill+'&quot;</span></div>'+
+    '<div class="sanity-item">Fill layers (avg) <span>'+(avgFill>0?(avgFill/2).toFixed(1):'0')+'</span></div>'+
+    '</div>'+w+'</div>';
+}
+function calcField(){
+  var area=parseFloat(document.getElementById('f-area').value);
+  var run=parseFloat(document.getElementById('f-run').value);
+  var waste=parseFloat(document.getElementById('f-waste').value);
+  var c=document.getElementById('field-results');
+  if(isNaN(area)||isNaN(run)||isNaN(waste)||area<=0||run<=0){c.innerHTML='<div class="warning show">Please enter valid area and run values.</div>';return}
+  var wf=1+waste/100;
+  var panels=Math.ceil(area/16*wf);
+  var af=Math.max(0,0.25*run-1);
+  var fill=af>0?Math.ceil(af*area/2/32*wf):0;
+  var peak=(0.5+0.5*run).toFixed(1);
+  var warn=null;
+  if(parseFloat(peak)>18)warn='Peak thickness of '+peak+'" is unusually high — verify taper slope and run with the designer.';
+  renderResults(c,panels,fill,peak,af.toFixed(2),warn);
+}
+function calcCricket(){
+  var area=parseFloat(document.getElementById('c-area').value);
+  var run=parseFloat(document.getElementById('c-run').value);
+  var waste=parseFloat(document.getElementById('c-waste').value);
+  var c=document.getElementById('cricket-results');
+  if(isNaN(area)||isNaN(run)||isNaN(waste)||area<=0||run<=0){c.innerHTML='<div class="warning show">Please enter valid area and run values.</div>';return}
+  var wf=1+waste/100;
+  var panels=Math.ceil(area/16*wf);
+  var af=Math.max(0,0.167*run-1);
+  var fill=af>0?Math.ceil(af*area/2/32*wf):0;
+  var peak=(0.5+0.5*run).toFixed(1);
+  var warn=null;
+  if(parseFloat(peak)>12)warn='Peak of '+peak+'" is high for a cricket — double-check that run = half drain spacing, not full spacing or wall depth.';
+  renderResults(c,panels,fill,peak,af.toFixed(2),warn);
+}
+document.addEventListener('keydown',function(e){if(e.key==='Enter'){if(activePanel==='field')calcField();else calcCricket()}});
+</script>
+</body>
+</html>
