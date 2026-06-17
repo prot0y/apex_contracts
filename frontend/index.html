@@ -2957,46 +2957,118 @@ Rules:
 
 // ── APP ROOT ──
 
-const ToolsPage = () => (
-  <div>
-    <div className="page-header">
-      <div>
-        <div className="page-title">TOOLS</div>
-        <div className="page-subtitle">Estimation and calculation tools</div>
-      </div>
-    </div>
-    <div className="content">
-      <div className="section-card" style={{ maxWidth: 480 }}>
-        <div className="section-card-header">
-          <div className="section-card-title">Insulation Calculators</div>
-        </div>
-        <div className="section-card-body" style={{ padding: 0 }}>
-          <div
-            style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.12s' }}
-            onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
-            onMouseLeave={e => e.currentTarget.style.background = ''}
-            onClick={() => window.open('/tapered-iso-calculator.html', '_blank')}
-          >
-            <div style={{ fontSize: 24 }}>📐</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>Tapered ISO Calculator</div>
-              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>Q panel + 2" fill quantities for field taper and cricket assemblies at 1/2"/ft</div>
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--accent)', fontFamily: 'DM Mono, monospace' }}>→</div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', opacity: 0.45 }}>
-            <div style={{ fontSize: 24 }}>🧮</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>STACK CT Assembly Reference</div>
-              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>Formula reference for field taper and cricket assemblies — coming soon</div>
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'DM Mono, monospace' }}>SOON</div>
-          </div>
+const ToolsPage = () => {
+  const [iframeUrl, setIframeUrl] = React.useState(null);
+  return (
+    <div>
+      <div className="page-header">
+        <div>
+          <div className="page-title">TOOLS</div>
+          <div className="page-subtitle">Estimation and calculation tools</div>
         </div>
       </div>
+      <div style={{ padding: '0 28px 28px' }}>
+        <div className="section-card" style={{ maxWidth: 480 }}>
+          <div className="section-card-header">
+            <div className="section-card-title">Insulation Calculators</div>
+          </div>
+          <div className="section-card-body" style={{ padding: 0 }}>
+            <div
+              style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.12s' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
+              onMouseLeave={e => e.currentTarget.style.background = ''}
+              onClick={() => setIframeUrl('/tapered-iso-calculator.html')}
+            >
+              <div style={{ fontSize: 24 }}>📐</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>Tapered ISO Calculator</div>
+                <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>Q panel + 2" fill quantities for field taper and cricket assemblies at 1/2"/ft</div>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--accent)', fontFamily: 'DM Mono, monospace' }}>→</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', opacity: 0.45 }}>
+              <div style={{ fontSize: 24 }}>🧮</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>STACK CT Assembly Reference</div>
+                <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>Formula reference for field taper and cricket assemblies — coming soon</div>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'DM Mono, monospace' }}>SOON</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {iframeUrl && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+             onClick={e => { if (e.target === e.currentTarget) setIframeUrl(null); }}>
+          <div style={{ background: '#fff', borderRadius: 12, overflow: 'hidden', width: '90vw', height: '88vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 60px rgba(0,0,0,0.3)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid #dde3ec', background: '#f5f7fa' }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#1a202c' }}>Tapered ISO Calculator</span>
+              <button onClick={() => setIframeUrl(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#718096', lineHeight: 1 }}>×</button>
+            </div>
+            <iframe src={iframeUrl} style={{ flex: 1, border: 'none', width: '100%' }} title="Tool" />
+          </div>
+        </div>
+      )}
     </div>
-  </div>
-);
+  );
+};
+
+
+const ToolsPage = () => {
+  const [iframeUrl, setIframeUrl] = React.useState(null);
+  return (
+    <div>
+      <div className="page-header">
+        <div>
+          <div className="page-title">TOOLS</div>
+          <div className="page-subtitle">Estimation and calculation tools</div>
+        </div>
+      </div>
+      <div style={{ padding: '0 28px 28px' }}>
+        <div className="section-card" style={{ maxWidth: 480 }}>
+          <div className="section-card-header">
+            <div className="section-card-title">Insulation Calculators</div>
+          </div>
+          <div className="section-card-body" style={{ padding: 0 }}>
+            <div
+              style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.12s' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
+              onMouseLeave={e => e.currentTarget.style.background = ''}
+              onClick={() => setIframeUrl('/tapered-iso-calculator.html')}
+            >
+              <div style={{ fontSize: 24 }}>📐</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>Tapered ISO Calculator</div>
+                <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>Q panel + 2" fill quantities for field taper and cricket assemblies at 1/2"/ft</div>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--accent)', fontFamily: 'DM Mono, monospace' }}>→</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', opacity: 0.45 }}>
+              <div style={{ fontSize: 24 }}>🧮</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>STACK CT Assembly Reference</div>
+                <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>Formula reference for field taper and cricket assemblies — coming soon</div>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'DM Mono, monospace' }}>SOON</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {iframeUrl && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+             onClick={e => { if (e.target === e.currentTarget) setIframeUrl(null); }}>
+          <div style={{ background: '#fff', borderRadius: 12, overflow: 'hidden', width: '90vw', height: '88vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 60px rgba(0,0,0,0.3)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid #dde3ec', background: '#f5f7fa' }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#1a202c' }}>Tapered ISO Calculator</span>
+              <button onClick={() => setIframeUrl(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#718096', lineHeight: 1 }}>×</button>
+            </div>
+            <iframe src={iframeUrl} style={{ flex: 1, border: 'none', width: '100%' }} title="Tool" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 function App() {
   const [page, setPage] = useState('dashboard');
