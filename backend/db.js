@@ -96,12 +96,15 @@ db.exec(`
     priority    TEXT NOT NULL DEFAULT 'normal',   -- low | normal | high
     source      TEXT NOT NULL DEFAULT 'manual',   -- manual | ai | email
     notes       TEXT DEFAULT '',
+    work_type   TEXT DEFAULT '',
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
   );
   CREATE INDEX IF NOT EXISTS idx_tasks_due    ON tasks(due_date);
   CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 `);
+// Migrate existing databases that predate the work_type column
+try { db.prepare("ALTER TABLE tasks ADD COLUMN work_type TEXT DEFAULT ''").run(); } catch (_) {}
 
 // ── ID HELPER ────────────────────────────────────────────────────────────────
 function uid(prefix = '') {
@@ -391,6 +394,7 @@ const tasks = {
       priority: row.priority,
       source: row.source,
       notes: row.notes,
+      workType: row.work_type || '',
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -414,22 +418,22 @@ const tasks = {
   get: (id) => tasks._hydrate(db.prepare('SELECT * FROM tasks WHERE id = ?').get(id)),
 
   create: ({ type = 'other', title, projectId = null, client = '', dueDate = null,
-             status = 'open', priority = 'normal', source = 'manual', notes = '' }) => {
+             status = 'open', priority = 'normal', source = 'manual', notes = '', workType = '' }) => {
     if (!title || !String(title).trim()) throw new Error('title is required');
     const safeType     = VALID_TASK_TYPE.includes(type) ? type : 'other';
     const safeStatus   = VALID_TASK_STATUS.includes(status) ? status : 'open';
     const safePriority = VALID_TASK_PRIORITY.includes(priority) ? priority : 'normal';
     const id = uid('t');
-    db.prepare(`INSERT INTO tasks (id, type, title, project_id, client, due_date, status, priority, source, notes)
-                VALUES (?,?,?,?,?,?,?,?,?,?)`)
-      .run(id, safeType, String(title).trim(), projectId, client, dueDate, safeStatus, safePriority, source, notes);
+    db.prepare(`INSERT INTO tasks (id, type, title, project_id, client, due_date, status, priority, source, notes, work_type)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(id, safeType, String(title).trim(), projectId, client, dueDate, safeStatus, safePriority, source, notes, workType);
     return tasks.get(id);
   },
 
   update: (id, fields) => {
     const map = {
       type: 'type', title: 'title', projectId: 'project_id', client: 'client',
-      dueDate: 'due_date', status: 'status', priority: 'priority', notes: 'notes',
+      dueDate: 'due_date', status: 'status', priority: 'priority', notes: 'notes', workType: 'work_type',
     };
     if (fields.type && !VALID_TASK_TYPE.includes(fields.type))
       throw new Error(`Invalid type "${fields.type}". Use one of: ${VALID_TASK_TYPE.join(', ')}`);

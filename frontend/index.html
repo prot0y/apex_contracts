@@ -2097,15 +2097,18 @@ function EmployeesPage({ employees, onAddEmployee, onDeleteEmployee, onUpdateEmp
 
 // ── CALENDAR ──────────────────────────────────────────────────────────────
 const TASK_TYPES = [
-  { id: 'itb',        label: 'Invitation to Bid', short: 'ITB',    color: '#1a6cff' },
-  { id: 'rfq',        label: 'Request for Quote', short: 'RFQ',    color: '#8b5cf6' },
-  { id: 'submittal',  label: 'Submittal',         short: 'SUB',    color: '#0a8a4e' },
-  { id: 'inspection', label: 'Inspection',        short: 'INSP',   color: '#0891b2' },
-  { id: 'deadline',   label: 'Deadline',          short: 'DUE',    color: '#d42b2b' },
-  { id: 'followup',   label: 'Follow-up',         short: 'F/U',    color: '#d97706' },
-  { id: 'other',      label: 'Other',             short: 'TASK',   color: '#8e8e93' },
+  { id: 'itb',      label: 'ITB / RFQ',  short: 'ITB',  color: '#1a6cff' },
+  { id: 'deadline', label: 'Deadline',   short: 'DUE',  color: '#d42b2b' },
+  { id: 'followup', label: 'Follow-up',  short: 'F/U',  color: '#d97706' },
+  { id: 'other',    label: 'Other',      short: 'TASK', color: '#8e8e93' },
 ];
 const TYPE_META = Object.fromEntries(TASK_TYPES.map(t => [t.id, t]));
+// Backward-compat aliases for legacy task types
+TYPE_META.rfq        = TYPE_META.itb;
+TYPE_META.submittal  = TYPE_META.other;
+TYPE_META.inspection = TYPE_META.other;
+
+const WORK_TYPES = ['New construction', 'Re-cover', 'Tear-off & replace', 'Remodel', 'Repair', 'Maintenance', 'Other'];
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -2128,17 +2131,17 @@ function CalendarPage({ projects, onSelectProject, refreshTick }) {
 
   const openCreate = (dateYMD) => {
     setEditing(null);
-    setForm({ type: 'itb', title: '', dueDate: dateYMD || '', client: '', projectId: '', priority: 'normal', status: 'open', notes: '' });
+    setForm({ type: 'itb', title: '', dueDate: dateYMD || '', client: '', workType: '', priority: 'normal', status: 'open', notes: '' });
   };
   const openEdit = (t) => {
     setEditing(t);
-    setForm({ type: t.type, title: t.title, dueDate: t.dueDate || '', client: t.client || '', projectId: t.projectId || '', priority: t.priority, status: t.status, notes: t.notes || '' });
+    setForm({ type: t.type, title: t.title, dueDate: t.dueDate || '', client: t.client || '', workType: t.workType || '', priority: t.priority, status: t.status, notes: t.notes || '' });
   };
   const closeForm = () => { setForm(null); setEditing(null); };
 
   const save = async () => {
     if (!form.title.trim()) return;
-    const payload = { ...form, projectId: form.projectId || null, dueDate: form.dueDate || null };
+    const payload = { ...form, dueDate: form.dueDate || null };
     if (editing) {
       await fetch(`/api/tasks/${editing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     } else {
@@ -2251,9 +2254,8 @@ function CalendarPage({ projects, onSelectProject, refreshTick }) {
                 <span style={{ flex: 1, fontWeight: 500 }}>
                   {t.priority === 'high' && <span style={{ color: 'var(--red)', marginRight: 6 }}>⚑</span>}
                   {t.title}
-                  {t.projectId
-                    ? <span style={{ color: 'var(--text3)', fontWeight: 400, cursor: 'pointer' }} onClick={() => onSelectProject && onSelectProject(projects.find(p => p.id === t.projectId))}> · {projName(t.projectId)}</span>
-                    : (t.client ? <span style={{ color: 'var(--text3)', fontWeight: 400 }}> · {t.client}</span> : null)}
+                  {t.client ? <span style={{ color: 'var(--text3)', fontWeight: 400 }}> · {t.client}</span> : null}
+                  {t.workType ? <span style={{ color: 'var(--text3)', fontWeight: 400 }}> · {t.workType}</span> : null}
                 </span>
                 <button className="cal-today-btn" onClick={() => setStatus(t, 'done')}>✓ Done</button>
                 <button className="cal-today-btn" onClick={() => openEdit(t)}>Edit</button>
@@ -2270,59 +2272,125 @@ function CalendarPage({ projects, onSelectProject, refreshTick }) {
       {form && (
         <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && closeForm()}>
           <div className="modal">
-            <div className="modal-header">
-              <div>
-                <div className="modal-title">{editing ? 'EDIT TASK' : 'NEW TASK'}</div>
-                <div style={{ color: 'var(--text3)', fontSize: 12, marginTop: 3 }}>Tasks can stand alone or link to a contract</div>
+            {/* ── Header: show task context when editing ── */}
+            <div className="modal-header" style={{ background: 'var(--surface2)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {editing && (
+                  <span style={{
+                    display: 'inline-block', fontSize: 10, fontWeight: 700, letterSpacing: 1,
+                    padding: '2px 8px', borderRadius: 20, marginBottom: 2,
+                    background: (TYPE_META[editing.type] || TYPE_META.other).color, color: '#fff',
+                  }}>
+                    {(TYPE_META[editing.type] || TYPE_META.other).short}
+                  </span>
+                )}
+                <div className="modal-title" style={{ fontSize: editing ? 18 : 24 }}>
+                  {editing ? (editing.title || 'Edit task') : 'NEW TASK'}
+                </div>
               </div>
               <button className="modal-close" onClick={closeForm}>×</button>
             </div>
+
             <div className="modal-body">
+              {/* ── DETAILS section ── */}
+              <div style={{ fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--text3)', fontFamily: "'DM Mono', monospace", paddingBottom: 8, borderBottom: '1px solid var(--border)', marginBottom: 14 }}>Details</div>
               <div className="form-grid">
                 <div className="form-group full">
                   <label className="form-label">Title</label>
                   <input className="form-input" autoFocus placeholder="e.g. Bid — Westfield HS gym re-roof"
                          value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
                 </div>
-                <div className="form-group">
+
+                {/* Type chips */}
+                <div className="form-group full">
                   <label className="form-label">Type</label>
-                  <select className="form-select" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
-                    {TASK_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                  </select>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {TASK_TYPES.map(t => (
+                      <button
+                        key={t.id}
+                        onClick={() => setForm({ ...form, type: t.id })}
+                        style={{
+                          fontSize: 12, padding: '5px 14px', borderRadius: 20, cursor: 'pointer',
+                          border: `2px solid ${form.type === t.id ? t.color : 'var(--border2)'}`,
+                          background: form.type === t.id ? t.color + '22' : 'var(--surface2)',
+                          color: form.type === t.id ? t.color : 'var(--text2)',
+                          fontWeight: form.type === t.id ? 600 : 400,
+                          transition: 'all 0.15s',
+                        }}
+                      >{t.label}</button>
+                    ))}
+                  </div>
                 </div>
+
+                {/* Due date */}
                 <div className="form-group">
                   <label className="form-label">Due Date</label>
-                  <input type="date" className="form-input" value={form.dueDate ? form.dueDate.slice(0,10) : ''} onChange={e => setForm({ ...form, dueDate: e.target.value })} />
+                  <div style={{ position: 'relative' }}>
+                    <input type="date" className="form-input" value={form.dueDate ? form.dueDate.slice(0,10) : ''} onChange={e => setForm({ ...form, dueDate: e.target.value })} />
+                    {form.dueDate && (() => {
+                      const diff = Math.round((new Date(form.dueDate) - new Date(todayYMD)) / 86400000);
+                      const label = diff === 0 ? 'Today' : diff === 1 ? 'Tomorrow' : diff < 0 ? `${Math.abs(diff)}d overdue` : `${diff}d away`;
+                      const color = diff < 0 ? 'var(--red)' : diff <= 3 ? '#d97706' : 'var(--text3)';
+                      return <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color, pointerEvents: 'none' }}>{label}</span>;
+                    })()}
+                  </div>
                 </div>
+
+                {/* Priority toggle */}
                 <div className="form-group">
                   <label className="form-label">Priority</label>
-                  <select className="form-select" value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })}>
-                    <option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option>
+                  <div style={{ display: 'flex', background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: 8, overflow: 'hidden' }}>
+                    {[['low','Low'],['normal','Normal'],['high','⚑ High']].map(([val, lbl]) => (
+                      <button key={val} onClick={() => setForm({ ...form, priority: val })} style={{
+                        flex: 1, border: 'none', cursor: 'pointer', padding: '7px 0', fontSize: 12, transition: 'all 0.15s',
+                        background: form.priority === val ? (val === 'high' ? '#fee2e2' : val === 'normal' ? '#dbeafe' : 'var(--surface3)') : 'transparent',
+                        color: form.priority === val ? (val === 'high' ? '#b91c1c' : val === 'normal' ? '#1d4ed8' : 'var(--text2)') : 'var(--text3)',
+                        fontWeight: form.priority === val ? 600 : 400,
+                      }}>{lbl}</button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Status strip */}
+                <div className="form-group full">
+                  <label className="form-label">Status</label>
+                  <div style={{ display: 'flex', background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: 8, overflow: 'hidden' }}>
+                    {[['open','Open'],['done','✓ Done'],['cancelled','Cancelled']].map(([val, lbl]) => (
+                      <button key={val} onClick={() => setForm({ ...form, status: val })} style={{
+                        flex: 1, border: 'none', cursor: 'pointer', padding: '7px 0', fontSize: 12, transition: 'all 0.15s',
+                        background: form.status === val ? (val === 'open' ? '#dcfce7' : val === 'done' ? '#dbeafe' : 'var(--surface3)') : 'transparent',
+                        color: form.status === val ? (val === 'open' ? '#166534' : val === 'done' ? '#1d4ed8' : 'var(--text2)') : 'var(--text3)',
+                        fontWeight: form.status === val ? 600 : 400,
+                      }}>{lbl}</button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="form-group full">
+                  <label className="form-label">Notes</label>
+                  <textarea className="form-input" rows={3} placeholder="Location, scope, contact, notes..."
+                    value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}
+                    style={{ resize: 'vertical', fontFamily: 'inherit' }} />
+                </div>
+              </div>
+
+              {/* ── CONTEXT section ── */}
+              <div style={{ fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--text3)', fontFamily: "'DM Mono', monospace", paddingBottom: 8, borderBottom: '1px solid var(--border)', margin: '20px 0 14px' }}>Context</div>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label className="form-label">Project type</label>
+                  <select className="form-select" value={form.workType} onChange={e => setForm({ ...form, workType: e.target.value })}>
+                    <option value="">— Select —</option>
+                    {WORK_TYPES.map(w => <option key={w} value={w}>{w}</option>)}
                   </select>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Status</label>
-                  <select className="form-select" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
-                    <option value="open">Open</option><option value="done">Done</option><option value="cancelled">Cancelled</option>
-                  </select>
-                </div>
-                <div className="form-group full">
-                  <label className="form-label">Link to Contract (optional)</label>
-                  <select className="form-select" value={form.projectId} onChange={e => setForm({ ...form, projectId: e.target.value })}>
-                    <option value="">— None (pipeline / pre-contract) —</option>
-                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                </div>
-                <div className="form-group full">
-                  <label className="form-label">Client / Requesting Company</label>
+                  <label className="form-label">Client / Company</label>
                   <input className="form-input" placeholder="e.g. Turner Construction" value={form.client} onChange={e => setForm({ ...form, client: e.target.value })} />
-                </div>
-                <div className="form-group full">
-                  <label className="form-label">Notes</label>
-                  <input className="form-input" placeholder="Location, scope, contact..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
                 </div>
               </div>
             </div>
+
             <div className="modal-footer">
               {editing && <button className="btn btn-danger" onClick={() => remove(editing)} style={{ marginRight: 'auto' }}>Delete</button>}
               <button className="btn btn-ghost" onClick={closeForm}>Cancel</button>
@@ -2472,15 +2540,15 @@ function Dashboard({ projects, employees, onSelectProject, refreshTick, onGoCale
             return sorted.map(t => {
               const meta = TYPE_META[t.type] || TYPE_META.other;
               const rel = t.dueDate ? relLabel(t.dueDate.slice(0, 10)) : { txt: 'no date', color: 'var(--text3)' };
-              const proj = t.projectId ? projects.find(p => p.id === t.projectId) : null;
               return (
-                <div key={t.id} className="agenda-item" onClick={() => proj && onSelectProject(proj)} style={{ cursor: proj ? 'pointer' : 'default' }}>
+                <div key={t.id} className="agenda-item">
                   <span className="agenda-date">{t.dueDate ? fmtDate(t.dueDate) : '—'}</span>
                   <span className="badge-type" style={{ background: meta.color }}>{meta.short}</span>
                   <span style={{ flex: 1, fontWeight: 500 }}>
                     {t.priority === 'high' && <span style={{ color: 'var(--red)', marginRight: 6 }}>⚑</span>}
                     {t.title}
-                    {(proj || t.client) && <span style={{ color: 'var(--text3)', fontWeight: 400 }}> · {proj ? proj.name : t.client}</span>}
+                    {t.client && <span style={{ color: 'var(--text3)', fontWeight: 400 }}> · {t.client}</span>}
+                    {t.workType && <span style={{ color: 'var(--text3)', fontWeight: 400 }}> · {t.workType}</span>}
                   </span>
                   <span style={{ fontSize: 12, fontWeight: 600, color: rel.color, fontFamily: 'DM Mono' }}>{rel.txt}</span>
                 </div>
